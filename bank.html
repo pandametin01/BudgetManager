@@ -102,6 +102,88 @@
       <section class="panel">
         <div class="panel-header">
           <div>
+            <p class="eyebrow">Verifica tecnica</p>
+            <h3>Accesso API Enable Banking</h3>
+          </div>
+          <button id="verifyBankApi" class="secondary" type="button">Verifica accesso API</button>
+        </div>
+
+        <div class="dual-columns">
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Applicazione registrata</h4>
+              <span id="bankApiTag" class="tag">Non verificata</span>
+            </div>
+            <div class="list-stack compact-stack">
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Nome app</h5>
+                  <strong id="bankApiName">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Application ID</h5>
+                  <strong id="bankApiKid">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Attiva</h5>
+                  <strong id="bankApiActive" class="negative">Non verificata</strong>
+                </div>
+              </article>
+            </div>
+          </article>
+
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Dettagli ambiente</h4>
+            </div>
+            <div class="list-stack compact-stack">
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Environment API</h5>
+                  <strong id="bankApiEnvironment">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Servizi</h5>
+                  <strong id="bankApiServices">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Redirect registrati</h5>
+                  <strong id="bankApiRedirects">-</strong>
+                </div>
+              </article>
+            </div>
+            <p id="bankApiMessage" class="list-meta">Qui vedremo se il Worker riesce a firmare il JWT e a leggere i dettagli della tua app sandbox.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Istituti</p>
+            <h3>Banche disponibili per il consenso</h3>
+          </div>
+          <button id="loadBankInstitutions" class="secondary" type="button">Carica istituti</button>
+        </div>
+
+        <div class="list-stack compact-stack" id="bankInstitutionsList">
+          <article class="list-item">
+            <p class="list-meta">Non ho ancora caricato gli istituti. Dopo la verifica API potremo controllare subito se Revolut compare nella lista.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
             <p class="eyebrow">Flusso previsto</p>
             <h3>Come funzionera la sync</h3>
           </div>

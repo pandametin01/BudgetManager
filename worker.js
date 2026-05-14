@@ -41,6 +41,178 @@ export default {
       );
     }
 
+    if (url.pathname === "/api/bank/health") {
+      try {
+        const application = await fetchEnableBankingApplication(env);
+        return Response.json(
+          {
+            ok: true,
+            application,
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      } catch (error) {
+        return Response.json(
+          {
+            ok: false,
+            error: error.message || "Enable Banking verification failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
+    if (url.pathname === "/api/bank/aspsps") {
+      try {
+        const search = new URLSearchParams();
+        if (url.searchParams.get("country")) {
+          search.set("country", url.searchParams.get("country"));
+        }
+        if (url.searchParams.get("service")) {
+          search.set("service", url.searchParams.get("service"));
+        }
+        if (url.searchParams.get("psu_type")) {
+          search.set("psu_type", url.searchParams.get("psu_type"));
+        }
+
+        const response = await callEnableBankingApi(env, `/aspsps${search.size ? `?${search.toString()}` : ""}`);
+        return Response.json(response, {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            error: error.message || "Enable Banking institutions fetch failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
+
+async function fetchEnableBankingApplication(env) {
+  return callEnableBankingApi(env, "/application");
+}
+
+async function callEnableBankingApi(env, path, init = {}) {
+  validateEnableBankingEnv(env);
+
+  const jwt = await buildEnableBankingJwt(env);
+  const response = await fetch(`https://api.enablebanking.com${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${jwt}`,
+      ...(init.headers || {}),
+    },
+  });
+
+  const bodyText = await response.text();
+  let body;
+  try {
+    body = bodyText ? JSON.parse(bodyText) : {};
+  } catch {
+    body = { raw: bodyText };
+  }
+
+  if (!response.ok) {
+    const message =
+      body?.message ||
+      body?.error_description ||
+      body?.detail ||
+      body?.raw ||
+      `Enable Banking request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  return body;
+}
+
+function validateEnableBankingEnv(env) {
+  if (!env.ENABLE_BANKING_APP_ID || !env.ENABLE_BANKING_PRIVATE_KEY || !env.ENABLE_BANKING_REDIRECT_URI) {
+    throw new Error("Mancano una o piu variabili Enable Banking nel Worker.");
+  }
+}
+
+async function buildEnableBankingJwt(env) {
+  const key = await importEnableBankingPrivateKey(env.ENABLE_BANKING_PRIVATE_KEY);
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    typ: "JWT",
+    alg: "RS256",
+    kid: env.ENABLE_BANKING_APP_ID,
+  };
+  const payload = {
+    iss: "enablebanking.com",
+    aud: "api.enablebanking.com",
+    iat: now,
+    exp: now + 300,
+  };
+
+  const encodedHeader = base64UrlEncodeJson(header);
+  const encodedPayload = base64UrlEncodeJson(payload);
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signatureBuffer = await crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5" },
+    key,
+    new TextEncoder().encode(signingInput),
+  );
+  const encodedSignature = base64UrlEncodeBytes(new Uint8Array(signatureBuffer));
+  return `${signingInput}.${encodedSignature}`;
+}
+
+async function importEnableBankingPrivateKey(privateKeyPem) {
+  const normalizedPem = String(privateKeyPem || "").replace(/\\n/g, "\n").trim();
+  const keyContents = normalizedPem
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s+/g, "");
+
+  if (!keyContents) {
+    throw new Error("Private key Enable Banking non valida.");
+  }
+
+  const binary = Uint8Array.from(atob(keyContents), (char) => char.charCodeAt(0));
+  return crypto.subtle.importKey(
+    "pkcs8",
+    binary.buffer,
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: "SHA-256",
+    },
+    false,
+    ["sign"],
+  );
+}
+
+function base64UrlEncodeJson(value) {
+  return base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
