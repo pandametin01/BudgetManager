@@ -958,6 +958,74 @@ function createPlannerDuplicateSignature(entry) {
   ].join("|");
 }
 
+function normalizeCompareText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function createPlannerDuplicateSignatureFromParts(date, amount, text) {
+  return [
+    date || "",
+    Number(amount || 0).toFixed(2),
+    normalizeCompareText(text),
+  ].join("|");
+}
+
+function extractPlannerComparisonTexts(item) {
+  return [
+    item?.note,
+    item?.bankLabel,
+    item?.creditorName,
+    item?.debtorName,
+    item?.bankEntryReference,
+    item?.bankTransactionId,
+    item?.bankExternalId,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+}
+
+function extractPreviewComparisonTexts(item) {
+  return [
+    item?.note,
+    item?.bankLabel,
+    item?.creditorName,
+    item?.debtorName,
+    item?.entryReference,
+    item?.transactionId,
+    item?.externalTransactionId,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+}
+
+function collectPlannerDuplicateSignatures(plannerState) {
+  const signatures = new Set();
+
+  (plannerState?.months || []).forEach((month) => {
+    (month?.transactions || []).forEach((item) => {
+      const texts = extractPlannerComparisonTexts(item);
+      if (!texts.length) {
+        signatures.add(createPlannerDuplicateSignature(item));
+        return;
+      }
+
+      texts.forEach((text) => {
+        signatures.add(createPlannerDuplicateSignatureFromParts(item.date, item.amount, text));
+      });
+    });
+  });
+
+  return signatures;
+}
+
+function previewMatchesPlannerDuplicate(preview, plannerDuplicateSignatures) {
+  return extractPreviewComparisonTexts(preview)
+    .some((text) => plannerDuplicateSignatures.has(createPlannerDuplicateSignatureFromParts(preview.date, preview.amount, text)));
+}
+
 function suggestCategoryFromTransaction(label, plannerCategories = []) {
   const normalized = String(label || "").toLowerCase();
   const staticRules = [
@@ -1060,10 +1128,7 @@ async function loadMissingBankTransactionsPreview() {
     const plannerCategories = buildPlannerCategorySuggestions(plannerState);
     refreshCategoryDatalist(plannerCategories);
     const importedExternalIds = new Set((importedRowsResult.data || []).map((row) => row.external_transaction_id));
-    const plannerDuplicates = new Set(
-      (plannerState.months || [])
-        .flatMap((month) => (month.transactions || []).map((item) => createPlannerDuplicateSignature(item))),
-    );
+    const plannerDuplicates = collectPlannerDuplicateSignatures(plannerState);
 
     const bankTransactions = Array.isArray(bankPayload.transactions) ? bankPayload.transactions : [];
     pendingBankImports = bankTransactions
@@ -1102,12 +1167,11 @@ async function loadMissingBankTransactionsPreview() {
           matchReliability: hasEntryReference ? "high" : hasReadableLabel ? "medium" : "low",
           matchReliabilityLabel: hasEntryReference ? "Alta · ID banca presente" : hasReadableLabel ? "Media · Match stimato" : "Bassa · Dati minimi",
         };
-        preview.duplicateSignature = createPlannerDuplicateSignature(preview);
         return preview;
       })
       .filter((preview) => preview.date)
       .filter((preview) => !importedExternalIds.has(preview.externalTransactionId))
-      .filter((preview) => !plannerDuplicates.has(preview.duplicateSignature));
+      .filter((preview) => !previewMatchesPlannerDuplicate(preview, plannerDuplicates));
 
     renderMissingTransactionsPreview();
     renderMissingTransactionsMessage(
