@@ -140,6 +140,9 @@ const els = {
   debtCount: document.getElementById("debtCount"),
   transactionCategorySelect: document.getElementById("transactionCategorySelect"),
   profileForm: document.getElementById("profileForm"),
+  backupForm: document.getElementById("backupForm"),
+  backupFileInput: document.getElementById("backupFileInput"),
+  backupStatus: document.getElementById("backupStatus"),
   incomeForm: document.getElementById("incomeForm"),
   billForm: document.getElementById("billForm"),
   categoryForm: document.getElementById("categoryForm"),
@@ -608,6 +611,68 @@ function saveLocalShadowState(username, plannerState) {
     state: cloneData(plannerState),
   };
   saveAccounts(accounts);
+}
+
+function setBackupStatus(message, tone = "") {
+  if (!els.backupStatus) {
+    return;
+  }
+  els.backupStatus.textContent = message || "";
+  els.backupStatus.className = tone ? `list-meta ${tone}` : "list-meta";
+}
+
+function createBackupPayload() {
+  return {
+    exportedAt: new Date().toISOString(),
+    username: getCurrentUsername(),
+    plannerState: cloneData(state),
+  };
+}
+
+function downloadBackupFile() {
+  const payload = createBackupPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  link.href = url;
+  link.download = `budget-planner-backup-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setBackupStatus("Backup JSON esportato.", "positive");
+}
+
+async function importBackupFile(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const incomingState = parsed?.plannerState || parsed?.state || parsed;
+    state = buildAccountState(incomingState, getCurrentUsername());
+    saveState();
+    renderMonthOptions();
+    populateForms();
+    render();
+    setBackupStatus("Backup importato correttamente.", "positive");
+  } catch (error) {
+    console.error("Errore import backup", error);
+    setBackupStatus("Importazione fallita. Controlla il file JSON.", "negative");
+  }
+}
+
+async function pushCurrentStateToSupabase() {
+  if (!isSupabaseEnabled() || !supabaseSession?.user) {
+    setBackupStatus("Fai login sul sito online con Supabase prima di caricare i dati.", "negative");
+    return;
+  }
+
+  await upsertRemotePlannerState(getCurrentUsername(), state);
+  setBackupStatus("Stato attuale caricato su Supabase.", "positive");
 }
 
 function initializeAccountsStore() {
@@ -1314,6 +1379,12 @@ function bindForms() {
     render();
   });
 
+  els.backupFileInput?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    await importBackupFile(file);
+    event.target.value = "";
+  });
+
   els.incomeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -1455,6 +1526,21 @@ function bindActions() {
     if (action === "reset-chart-zoom") {
       clearChartZoom();
       render();
+      return;
+    }
+
+    if (action === "export-backup") {
+      downloadBackupFile();
+      return;
+    }
+
+    if (action === "import-backup") {
+      els.backupFileInput?.click();
+      return;
+    }
+
+    if (action === "push-supabase") {
+      pushCurrentStateToSupabase();
       return;
     }
 
