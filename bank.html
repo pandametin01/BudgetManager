@@ -195,9 +195,30 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Pagina di prova</p>
-            <h3>Transazioni ultimi 5 giorni</h3>
+            <h3>Transazioni banca su periodo personalizzato</h3>
           </div>
-          <button id="loadRecentTransactions" class="secondary" type="button">Carica ultimi 5 giorni</button>
+          <div class="inline-actions">
+            <label>
+              Preset
+              <select id="bankRangePreset">
+                <option value="5d">Ultimi 5 giorni</option>
+                <option value="30d">Ultimi 30 giorni</option>
+                <option value="1y">Ultimo anno</option>
+                <option value="2y">Ultimi 2 anni</option>
+                <option value="3y">Ultimi 3 anni</option>
+                <option value="custom">Periodo personalizzato</option>
+              </select>
+            </label>
+            <label>
+              Da
+              <input id="bankRangeStart" type="date" />
+            </label>
+            <label>
+              A
+              <input id="bankRangeEnd" type="date" />
+            </label>
+            <button id="loadRecentTransactions" class="secondary" type="button">Carica transazioni</button>
+          </div>
         </div>
 
         <div class="dual-columns">
@@ -262,6 +283,24 @@
           </div>
           <div class="inline-actions">
             <button id="toggleBankDebug" class="secondary" type="button">Mostra debug banca</button>
+            <label>
+              Preset
+              <select id="bankImportPreset">
+                <option value="30d">Ultimi 30 giorni</option>
+                <option value="1y">Ultimo anno</option>
+                <option value="2y">Ultimi 2 anni</option>
+                <option value="3y">Ultimi 3 anni</option>
+                <option value="custom">Periodo personalizzato</option>
+              </select>
+            </label>
+            <label>
+              Da
+              <input id="bankImportStart" type="date" />
+            </label>
+            <label>
+              A
+              <input id="bankImportEnd" type="date" />
+            </label>
             <button id="loadMissingBankTransactions" class="secondary" type="button">Esporta transazioni mancanti dalla banca</button>
             <button id="cleanupBankTransactions" class="secondary" type="button">Pulisci memoria import banca</button>
             <button id="includeAllBankTransactions" class="secondary" type="button">Includi tutto</button>

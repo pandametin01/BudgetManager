@@ -234,12 +234,24 @@ export default {
           throw new Error("Account UID mancante.");
         }
 
-        const days = Number.parseInt(body?.days, 10);
-        const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 30) : 5;
-        const now = new Date();
-        const from = new Date(now.getTime() - safeDays * 24 * 60 * 60 * 1000);
-        const dateFrom = formatIsoDate(from);
-        const dateTo = formatIsoDate(now);
+        let dateFrom = String(body?.dateFrom || "").trim();
+        let dateTo = String(body?.dateTo || "").trim();
+        if (!dateFrom || !dateTo) {
+          const days = Number.parseInt(body?.days, 10);
+          const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 1095) : 5;
+          const now = new Date();
+          const from = new Date(now.getTime() - safeDays * 24 * 60 * 60 * 1000);
+          dateFrom = formatIsoDate(from);
+          dateTo = formatIsoDate(now);
+        }
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+          throw new Error("Intervallo date non valido.");
+        }
+        if (dateFrom > dateTo) {
+          throw new Error("La data iniziale non puo essere successiva alla data finale.");
+        }
+
         const transactions = await fetchAllRecentTransactions(env, accountUid, dateFrom, dateTo);
 
         return Response.json(

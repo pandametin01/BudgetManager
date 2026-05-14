@@ -53,6 +53,9 @@ const els = {
   bankInstitutionSearch: document.getElementById("bankInstitutionSearch"),
   bankInstitutionsList: document.getElementById("bankInstitutionsList"),
   loadRecentTransactions: document.getElementById("loadRecentTransactions"),
+  bankRangePreset: document.getElementById("bankRangePreset"),
+  bankRangeStart: document.getElementById("bankRangeStart"),
+  bankRangeEnd: document.getElementById("bankRangeEnd"),
   bankConnectionTag: document.getElementById("bankConnectionTag"),
   bankConnectedInstitution: document.getElementById("bankConnectedInstitution"),
   bankConnectedSession: document.getElementById("bankConnectedSession"),
@@ -63,6 +66,9 @@ const els = {
   bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
   bankTransactionsList: document.getElementById("bankTransactionsList"),
   loadMissingBankTransactions: document.getElementById("loadMissingBankTransactions"),
+  bankImportPreset: document.getElementById("bankImportPreset"),
+  bankImportStart: document.getElementById("bankImportStart"),
+  bankImportEnd: document.getElementById("bankImportEnd"),
   cleanupBankTransactions: document.getElementById("cleanupBankTransactions"),
   includeAllBankTransactions: document.getElementById("includeAllBankTransactions"),
   excludeAllBankTransactions: document.getElementById("excludeAllBankTransactions"),
@@ -78,12 +84,20 @@ let availableInstitutions = [];
 let linkedBankSession = null;
 let pendingBankImports = [];
 let showBankDebug = false;
+const BANK_RANGE_PRESET_DAYS = {
+  "5d": 5,
+  "30d": 30,
+  "1y": 365,
+  "2y": 730,
+  "3y": 1095,
+};
 
 bootstrap();
 
 async function bootstrap() {
   await initializeSupabase();
   bindEvents();
+  initializeRangeControls();
   updateUsername();
   restoreLinkedBankSession();
   await restoreLinkedBankSessionFromCloud();
@@ -137,6 +151,78 @@ function updateUsername() {
   if (els.currentUsername) {
     els.currentUsername.textContent = getCurrentUsername() || "utente";
   }
+}
+
+function formatDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function applyPresetRange(preset, startInput, endInput) {
+  if (!startInput || !endInput || preset === "custom") {
+    return;
+  }
+
+  const days = BANK_RANGE_PRESET_DAYS[preset];
+  if (!days) {
+    return;
+  }
+
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+  startInput.value = formatDateInputValue(start);
+  endInput.value = formatDateInputValue(end);
+}
+
+function initializeRangeControls() {
+  applyPresetRange(els.bankRangePreset?.value || "5d", els.bankRangeStart, els.bankRangeEnd);
+  applyPresetRange(els.bankImportPreset?.value || "30d", els.bankImportStart, els.bankImportEnd);
+}
+
+function describeRangeLabel(preset, dateFrom, dateTo) {
+  if (preset === "custom") {
+    return `dal ${dateFrom} al ${dateTo}`;
+  }
+  if (preset === "5d") {
+    return "negli ultimi 5 giorni";
+  }
+  if (preset === "30d") {
+    return "negli ultimi 30 giorni";
+  }
+  if (preset === "1y") {
+    return "nell'ultimo anno";
+  }
+  if (preset === "2y") {
+    return "negli ultimi 2 anni";
+  }
+  if (preset === "3y") {
+    return "negli ultimi 3 anni";
+  }
+  return `dal ${dateFrom} al ${dateTo}`;
+}
+
+function resolveSelectedRange(presetInput, startInput, endInput, fallbackPreset) {
+  const preset = presetInput?.value || fallbackPreset;
+  const fallback = preset === "custom" ? fallbackPreset : preset;
+  if ((!startInput?.value || !endInput?.value) && fallback) {
+    applyPresetRange(fallback, startInput, endInput);
+  }
+
+  const dateFrom = String(startInput?.value || "").trim();
+  const dateTo = String(endInput?.value || "").trim();
+  if (!dateFrom || !dateTo) {
+    throw new Error("Imposta una data iniziale e finale valide.");
+  }
+
+  if (dateFrom > dateTo) {
+    throw new Error("La data iniziale non puo essere successiva alla data finale.");
+  }
+
+  return {
+    preset,
+    dateFrom,
+    dateTo,
+    label: describeRangeLabel(preset, dateFrom, dateTo),
+  };
 }
 
 function setCheck(node, ready) {
@@ -1218,7 +1304,8 @@ async function loadMissingBankTransactionsPreview() {
   }
 
   try {
-    renderMissingTransactionsMessage("Sto confrontando le transazioni bancarie con quelle gia presenti nel planner...");
+    const range = resolveSelectedRange(els.bankImportPreset, els.bankImportStart, els.bankImportEnd, "30d");
+    renderMissingTransactionsMessage(`Sto confrontando le transazioni bancarie con quelle gia presenti nel planner ${range.label}...`);
     const [plannerRow, importedRowsResult, bankResponse] = await Promise.all([
       fetchRemotePlannerRow(),
       supabaseClient
@@ -1232,7 +1319,8 @@ async function loadMissingBankTransactionsPreview() {
         },
         body: JSON.stringify({
           accountUid,
-          days: 30,
+          dateFrom: range.dateFrom,
+          dateTo: range.dateTo,
         }),
       }),
     ]);
@@ -1302,8 +1390,8 @@ async function loadMissingBankTransactionsPreview() {
     renderMissingTransactionsPreview();
     renderMissingTransactionsMessage(
       pendingBankImports.length
-        ? `Ho trovato ${pendingBankImports.length} transazioni mancanti negli ultimi 30 giorni. Puoi correggerle prima di inserirle.`
-        : "Non ho trovato transazioni mancanti da importare negli ultimi 30 giorni.",
+        ? `Ho trovato ${pendingBankImports.length} transazioni mancanti ${range.label}. Puoi correggerle prima di inserirle.`
+        : `Non ho trovato transazioni mancanti da importare ${range.label}.`,
       pendingBankImports.length ? "positive" : "",
     );
   } catch (error) {
@@ -1454,7 +1542,7 @@ async function insertMissingBankTransactions() {
   }
 }
 
-function renderRecentTransactions(transactions) {
+function renderRecentTransactions(transactions, emptyLabel = "nel periodo selezionato") {
   if (!els.bankTransactionsList) {
     return;
   }
@@ -1462,7 +1550,7 @@ function renderRecentTransactions(transactions) {
   if (!transactions.length) {
     els.bankTransactionsList.innerHTML = `
       <article class="list-item">
-        <p class="list-meta">Nessuna transazione trovata negli ultimi 5 giorni per il conto selezionato.</p>
+        <p class="list-meta">Nessuna transazione trovata ${escapeHtml(emptyLabel)} per il conto selezionato.</p>
       </article>
     `;
     return;
@@ -1508,9 +1596,10 @@ async function loadRecentTransactions() {
   }
 
   try {
+    const range = resolveSelectedRange(els.bankRangePreset, els.bankRangeStart, els.bankRangeEnd, "5d");
     els.bankTransactionsTag.textContent = "Caricamento...";
     els.bankTransactionsTag.className = "tag";
-    els.bankTransactionsMessage.textContent = "Sto leggendo le transazioni degli ultimi 5 giorni dal conto collegato.";
+    els.bankTransactionsMessage.textContent = `Sto leggendo le transazioni ${range.label} dal conto collegato.`;
     const response = await fetch("/api/bank/transactions/recent", {
       method: "POST",
       headers: {
@@ -1519,7 +1608,8 @@ async function loadRecentTransactions() {
       body: JSON.stringify({
         sessionId: linkedBankSession.sessionId,
         accountUid,
-        days: 5,
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
       }),
     });
     const payload = await response.json();
@@ -1528,10 +1618,10 @@ async function loadRecentTransactions() {
     }
 
     const transactions = Array.isArray(payload.transactions) ? payload.transactions : [];
-    renderRecentTransactions(transactions);
+    renderRecentTransactions(transactions, range.label);
     els.bankTransactionsTag.textContent = "Ok";
     els.bankTransactionsTag.className = "tag positive";
-    els.bankTransactionsMessage.textContent = `Ho trovato ${transactions.length} movimenti negli ultimi 5 giorni sul conto selezionato.`;
+    els.bankTransactionsMessage.textContent = `Ho trovato ${transactions.length} movimenti ${range.label} sul conto selezionato.`;
   } catch (error) {
     els.bankTransactionsTag.textContent = "Errore";
     els.bankTransactionsTag.className = "tag negative";
@@ -1555,6 +1645,14 @@ function bindEvents() {
 
   els.loadRecentTransactions?.addEventListener("click", () => {
     loadRecentTransactions();
+  });
+
+  els.bankRangePreset?.addEventListener("change", () => {
+    applyPresetRange(els.bankRangePreset.value, els.bankRangeStart, els.bankRangeEnd);
+  });
+
+  els.bankImportPreset?.addEventListener("change", () => {
+    applyPresetRange(els.bankImportPreset.value, els.bankImportStart, els.bankImportEnd);
   });
 
   els.loadMissingBankTransactions?.addEventListener("click", () => {
