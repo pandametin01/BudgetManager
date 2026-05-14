@@ -898,12 +898,16 @@ function firstUsefulTransactionText(...values) {
 
 function normalizeTransactionLabel(transaction) {
   const remittance = transaction?.remittance_information;
-  const remittanceText = Array.isArray(remittance?.unstructured)
-    ? remittance.unstructured.join(" ")
-    : remittance?.unstructured || remittance?.reference || "";
+  const remittanceText = Array.isArray(remittance)
+    ? remittance.join(" ")
+    : Array.isArray(remittance?.unstructured)
+      ? remittance.unstructured.join(" ")
+      : remittance?.unstructured || remittance?.reference || "";
   return (
     firstUsefulTransactionText(
       transaction?.merchant_name,
+      transaction?.debtor?.name,
+      transaction?.creditor?.name,
       transaction?.creditor_name,
       transaction?.debtor_name,
       transaction?.counterparty_name,
