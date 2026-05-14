@@ -60,6 +60,7 @@ const els = {
   bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
   bankTransactionsList: document.getElementById("bankTransactionsList"),
   loadMissingBankTransactions: document.getElementById("loadMissingBankTransactions"),
+  cleanupBankTransactions: document.getElementById("cleanupBankTransactions"),
   includeAllBankTransactions: document.getElementById("includeAllBankTransactions"),
   excludeAllBankTransactions: document.getElementById("excludeAllBankTransactions"),
   insertMissingBankTransactions: document.getElementById("insertMissingBankTransactions"),
@@ -1060,6 +1061,16 @@ function collectPlannerBankLinkState(plannerState) {
   return { plannerTransactionIds, plannerExternalIds };
 }
 
+function isImportedBankRowStillLinked(row, plannerLinkState) {
+  const plannerTransactionId = String(row?.planner_transaction_id || "").trim();
+  const externalTransactionId = String(row?.external_transaction_id || "").trim();
+
+  return (
+    (plannerTransactionId && plannerLinkState.plannerTransactionIds.has(plannerTransactionId))
+    || (externalTransactionId && plannerLinkState.plannerExternalIds.has(externalTransactionId))
+  );
+}
+
 function resolvePreferredCategoryName(category, plannerCategories = []) {
   const aliases = {
     Bonifici: ["Bonifici", "Bonifici privati"],
@@ -1200,18 +1211,10 @@ async function loadMissingBankTransactionsPreview() {
     const plannerState = plannerRow?.planner_state || { months: [] };
     const plannerCategories = buildPlannerCategorySuggestions(plannerState);
     refreshCategoryDatalist(plannerCategories);
-    const { plannerTransactionIds, plannerExternalIds } = collectPlannerBankLinkState(plannerState);
+    const plannerLinkState = collectPlannerBankLinkState(plannerState);
     const importedExternalIds = new Set(
       (importedRowsResult.data || [])
-        .filter((row) => {
-          const plannerTransactionId = String(row?.planner_transaction_id || "").trim();
-          const externalTransactionId = String(row?.external_transaction_id || "").trim();
-
-          return (
-            (plannerTransactionId && plannerTransactionIds.has(plannerTransactionId))
-            || (externalTransactionId && plannerExternalIds.has(externalTransactionId))
-          );
-        })
+        .filter((row) => isImportedBankRowStillLinked(row, plannerLinkState))
         .map((row) => row.external_transaction_id),
     );
     const plannerDuplicates = collectPlannerDuplicateSignatures(plannerState);
@@ -1270,6 +1273,54 @@ async function loadMissingBankTransactionsPreview() {
     pendingBankImports = [];
     renderMissingTransactionsPreview();
     renderMissingTransactionsMessage(error.message || "Non riesco a preparare l'anteprima di import.", "negative");
+  }
+}
+
+async function cleanupBankTransactionMemory() {
+  if (!isSupabaseEnabled()) {
+    renderMissingTransactionsMessage("Serve il login Supabase per pulire la memoria import banca.", "negative");
+    return;
+  }
+
+  try {
+    renderMissingTransactionsMessage("Sto pulendo la memoria import banca non piu collegata al planner...");
+    const [plannerRow, importedRowsResult] = await Promise.all([
+      fetchRemotePlannerRow(),
+      supabaseClient
+        .from("bank_transactions")
+        .select("id, external_transaction_id, planner_transaction_id")
+        .eq("user_id", supabaseSession.user.id),
+    ]);
+
+    if (importedRowsResult.error) {
+      throw new Error(importedRowsResult.error.message || "Errore lettura memoria import banca.");
+    }
+
+    const plannerState = plannerRow?.planner_state || { months: [] };
+    const plannerLinkState = collectPlannerBankLinkState(plannerState);
+    const staleIds = (importedRowsResult.data || [])
+      .filter((row) => !isImportedBankRowStillLinked(row, plannerLinkState))
+      .map((row) => row.id)
+      .filter(Boolean);
+
+    if (!staleIds.length) {
+      renderMissingTransactionsMessage("La memoria import banca e gia pulita: non ho trovato record orfani.", "positive");
+      return;
+    }
+
+    const deleteResult = await supabaseClient
+      .from("bank_transactions")
+      .delete()
+      .eq("user_id", supabaseSession.user.id)
+      .in("id", staleIds);
+
+    if (deleteResult.error) {
+      throw new Error(deleteResult.error.message || "Errore cancellazione memoria import banca.");
+    }
+
+    renderMissingTransactionsMessage(`Ho rimosso ${staleIds.length} record orfani dalla memoria import banca.`, "positive");
+  } catch (error) {
+    renderMissingTransactionsMessage(error.message || "Non riesco a pulire la memoria import banca.", "negative");
   }
 }
 
@@ -1471,6 +1522,10 @@ function bindEvents() {
 
   els.loadMissingBankTransactions?.addEventListener("click", () => {
     loadMissingBankTransactionsPreview();
+  });
+
+  els.cleanupBankTransactions?.addEventListener("click", () => {
+    cleanupBankTransactionMemory();
   });
 
   els.includeAllBankTransactions?.addEventListener("click", () => {
