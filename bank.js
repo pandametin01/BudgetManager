@@ -778,14 +778,77 @@ function normalizeTransactionAmount(transaction) {
 }
 
 function normalizeTransactionDate(transaction) {
-  return (
-    transaction?.booking_date_time ||
-    transaction?.value_date_time ||
-    transaction?.booking_date ||
-    transaction?.value_date ||
-    transaction?.status_update_date_time ||
-    ""
-  );
+  const dateFields = [
+    transaction?.booking_date_time,
+    transaction?.value_date_time,
+    transaction?.status_update_date_time,
+    transaction?.transaction_date_time,
+    transaction?.booking_date,
+    transaction?.value_date,
+    transaction?.transaction_date,
+  ];
+  return dateFields.find((value) => String(value || "").trim()) || "";
+}
+
+function extractTransactionDateParts(transaction) {
+  const rawValue = String(normalizeTransactionDate(transaction) || "").trim();
+  if (!rawValue) {
+    return { date: "", time: "" };
+  }
+
+  const directDateMatch = rawValue.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  if (directDateMatch) {
+    return { date: directDateMatch[1], time: directDateMatch[2] };
+  }
+
+  const onlyDateMatch = rawValue.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (onlyDateMatch) {
+    return { date: onlyDateMatch[1], time: extractFallbackTime(transaction) };
+  }
+
+  const parsedDate = new Date(rawValue);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return {
+      date: `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}-${String(parsedDate.getDate()).padStart(2, "0")}`,
+      time: `${String(parsedDate.getHours()).padStart(2, "0")}:${String(parsedDate.getMinutes()).padStart(2, "0")}`,
+    };
+  }
+
+  return { date: rawValue.slice(0, 10), time: extractFallbackTime(transaction) };
+}
+
+function extractFallbackTime(transaction) {
+  const timeCandidates = [
+    transaction?.booking_time,
+    transaction?.value_time,
+    transaction?.transaction_time,
+    transaction?.status_update_time,
+  ];
+  const explicitTime = timeCandidates.find((value) => String(value || "").trim());
+  if (explicitTime) {
+    return String(explicitTime).trim().slice(0, 5);
+  }
+  return "";
+}
+
+function isTechnicalIdentifier(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return true;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
+}
+
+function firstUsefulTransactionText(...values) {
+  for (const value of values.flat()) {
+    const normalized = String(value || "").trim();
+    if (!normalized || isTechnicalIdentifier(normalized)) {
+      continue;
+    }
+    return normalized;
+  }
+  return "";
 }
 
 function normalizeTransactionLabel(transaction) {
@@ -794,13 +857,22 @@ function normalizeTransactionLabel(transaction) {
     ? remittance.unstructured.join(" ")
     : remittance?.unstructured || remittance?.reference || "";
   return (
-    transaction?.creditor_name ||
-    transaction?.debtor_name ||
-    transaction?.merchant_name ||
-    remittanceText ||
-    transaction?.entry_reference ||
-    transaction?.transaction_id ||
-    "Movimento bancario"
+    firstUsefulTransactionText(
+      transaction?.merchant_name,
+      transaction?.creditor_name,
+      transaction?.debtor_name,
+      transaction?.counterparty_name,
+      transaction?.ultimate_creditor,
+      transaction?.ultimate_debtor,
+      remittanceText,
+      transaction?.transaction_information,
+      transaction?.additional_information,
+      transaction?.proprietary_bank_transaction_code?.description,
+      transaction?.proprietary_bank_transaction_code?.code,
+      transaction?.end_to_end_identification,
+      transaction?.entry_reference,
+      transaction?.transaction_id,
+    ) || "Movimento bancario"
   );
 }
 
@@ -936,9 +1008,7 @@ async function loadMissingBankTransactionsPreview() {
     pendingBankImports = bankTransactions
       .map((transaction) => {
         const amountInfo = normalizeTransactionAmount(transaction);
-        const dateTimeValue = normalizeTransactionDate(transaction);
-        const [datePart, timePartRaw = ""] = String(dateTimeValue || "").split("T");
-        const timePart = timePartRaw ? timePartRaw.slice(0, 5) : "";
+        const { date: datePart, time: timePart } = extractTransactionDateParts(transaction);
         const note = normalizeTransactionLabel(transaction);
         const type = amountInfo.amount >= 0 ? "income" : "expense";
         const category = type === "income" ? "Entrate" : suggestCategoryFromTransaction(note, plannerCategories);
