@@ -198,6 +198,34 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/bank/session/status") {
+      try {
+        const sessionId = url.searchParams.get("sessionId");
+        if (!sessionId) {
+          throw new Error("Session ID mancante.");
+        }
+
+        const response = await callEnableBankingApi(env, `/sessions/${encodeURIComponent(sessionId)}`);
+        return Response.json(response, {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            error: error.message || "Enable Banking session status failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
     if (url.pathname === "/api/bank/transactions/recent" && request.method === "POST") {
       try {
         const body = await request.json();

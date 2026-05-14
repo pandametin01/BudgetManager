@@ -239,6 +239,29 @@
       <section class="panel">
         <div class="panel-header">
           <div>
+            <p class="eyebrow">Import guidato</p>
+            <h3>Esporta transazioni mancanti dalla banca</h3>
+          </div>
+          <div class="inline-actions">
+            <button id="loadMissingBankTransactions" class="secondary" type="button">Esporta transazioni mancanti dalla banca</button>
+            <button id="insertMissingBankTransactions" class="primary" type="button">Inserisci nel database del sito</button>
+          </div>
+        </div>
+
+        <p id="bankMissingTransactionsMessage" class="list-meta">
+          Confrontero i movimenti bancari con quelli gia presenti nel planner e ti mostrero solo i mancanti in una preview modificabile.
+        </p>
+
+        <div class="list-stack compact-stack" id="bankMissingTransactionsList">
+          <article class="list-item">
+            <p class="list-meta">Non ho ancora preparato nessuna anteprima di import.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
             <p class="eyebrow">Flusso previsto</p>
             <h3>Come funzionera la sync</h3>
           </div>

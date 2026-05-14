@@ -1134,6 +1134,43 @@ input {
   outline-offset: 2px;
 }
 
+.bank-preview-card {
+  display: grid;
+  gap: 12px;
+}
+
+.bank-preview-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.bank-preview-header label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.bank-preview-grid {
+  display: grid;
+  grid-template-columns: 120px 100px 140px 180px 120px minmax(180px, 1fr);
+  gap: 10px;
+}
+
+.bank-preview-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.bank-preview-grid input,
+.bank-preview-grid select {
+  padding: 10px 12px;
+}
+
 .category-accordion {
   padding: 0;
   overflow: hidden;
@@ -1527,6 +1564,10 @@ input {
   .wide-form button,
   .wide-form .wide {
     grid-column: span 1;
+  }
+
+  .bank-preview-grid {
+    grid-template-columns: 1fr;
   }
 
   .panel-header,
