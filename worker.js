@@ -105,6 +105,99 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/bank/auth/start" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const redirectUri = env.ENABLE_BANKING_REDIRECT_URI;
+        const state = crypto.randomUUID();
+        const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+        const payload = {
+          access: {
+            valid_until: validUntil,
+          },
+          aspsp: {
+            name: body?.aspsp?.name,
+            country: body?.aspsp?.country || "IT",
+          },
+          redirect_url: redirectUri,
+          state,
+          language: "it",
+        };
+
+        if (body?.psuType) {
+          payload.psu_type = body.psuType;
+        }
+        if (body?.authMethod) {
+          payload.auth_method = body.authMethod;
+        }
+
+        const response = await callEnableBankingApi(env, "/auth", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        return Response.json(
+          {
+            ...response,
+            state,
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      } catch (error) {
+        return Response.json(
+          {
+            error: error.message || "Enable Banking authorization start failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
+    if (url.pathname === "/api/bank/session/complete" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const response = await callEnableBankingApi(env, "/sessions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            code: body?.code,
+          }),
+        });
+
+        return Response.json(response, {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
+      } catch (error) {
+        return Response.json(
+          {
+            error: error.message || "Enable Banking session completion failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
     return env.ASSETS.fetch(request);
   },
 };

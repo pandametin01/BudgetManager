@@ -1113,6 +1113,27 @@ input {
   border: 1px solid rgba(29, 44, 40, 0.06);
 }
 
+.bank-institution-button {
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  border-radius: 18px;
+  background: white;
+  border: 1px solid rgba(29, 44, 40, 0.06);
+  cursor: pointer;
+}
+
+.bank-institution-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(214, 107, 61, 0.26);
+  box-shadow: 0 12px 26px rgba(53, 39, 25, 0.08);
+}
+
+.bank-institution-button:focus-visible {
+  outline: 2px solid rgba(214, 107, 61, 0.36);
+  outline-offset: 2px;
+}
+
 .category-accordion {
   padding: 0;
   overflow: hidden;

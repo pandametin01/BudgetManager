@@ -30,6 +30,7 @@ const els = {
 
 let supabaseClient = null;
 let supabaseSession = null;
+let availableInstitutions = [];
 
 bootstrap();
 
@@ -38,6 +39,7 @@ async function bootstrap() {
   bindEvents();
   updateUsername();
   await refreshBankConfig();
+  await handleAuthCallback();
 }
 
 async function initializeSupabase() {
@@ -101,6 +103,10 @@ function renderInstitutionMessage(message) {
   `;
 }
 
+function getInstitutionByName(name) {
+  return availableInstitutions.find((institution) => String(institution.name || "") === String(name || ""));
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -108,6 +114,23 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getAuthStateStorageKey() {
+  const username = getCurrentUsername() || "guest";
+  return `budget-bank-auth-state:${username}`;
+}
+
+function setPendingAuthState(value) {
+  sessionStorage.setItem(getAuthStateStorageKey(), value);
+}
+
+function getPendingAuthState() {
+  return sessionStorage.getItem(getAuthStateStorageKey()) || "";
+}
+
+function clearPendingAuthState() {
+  sessionStorage.removeItem(getAuthStateStorageKey());
 }
 
 async function refreshBankConfig() {
@@ -189,6 +212,7 @@ async function loadBankInstitutions() {
     }
 
     const aspsps = Array.isArray(payload.aspsps) ? payload.aspsps : [];
+    availableInstitutions = aspsps;
     if (!aspsps.length) {
       renderInstitutionMessage("Nessun istituto trovato per il filtro corrente.");
       return;
@@ -215,20 +239,133 @@ async function loadBankInstitutions() {
           Array.isArray(institution.auth_methods) && institution.auth_methods.length
             ? institution.auth_methods.map((method) => method.name).filter(Boolean).join(", ")
             : "n/d";
+        const encodedName = escapeHtml(institution.name || "");
         return `
-          <article class="list-item">
+          <button type="button" class="list-item bank-institution-button" data-bank-name="${encodedName}">
             <div class="list-item-top">
               <h5>${name}</h5>
               <strong>${country}</strong>
             </div>
             <p class="list-meta">PSU type: ${escapeHtml(psuTypes)}</p>
             <p class="list-meta">Auth methods: ${escapeHtml(authMethods)}</p>
-          </article>
+          </button>
         `;
       })
       .join("");
   } catch (error) {
     renderInstitutionMessage(error.message || "Non riesco a caricare gli istituti.");
+  }
+}
+
+async function startBankAuthorization(bankName) {
+  const institution = getInstitutionByName(bankName);
+  if (!institution) {
+    renderInstitutionMessage("Non riesco a trovare l'istituto selezionato.");
+    return;
+  }
+
+  try {
+    renderInstitutionMessage(`Sto avviando il consenso per ${bankName}...`);
+    const preferredMethod =
+      Array.isArray(institution.auth_methods) && institution.auth_methods.length
+        ? institution.auth_methods.find((method) => method.psu_type === "personal" && !method.hidden_method) ||
+          institution.auth_methods.find((method) => !method.hidden_method) ||
+          institution.auth_methods[0]
+        : null;
+
+    const response = await fetch("/api/bank/auth/start", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        aspsp: {
+          name: institution.name,
+          country: institution.country || "IT",
+        },
+        psuType: preferredMethod?.psu_type || (Array.isArray(institution.psu_types) && institution.psu_types.includes("personal") ? "personal" : null),
+        authMethod: preferredMethod?.name || null,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error || "Avvio consenso non riuscito");
+    }
+
+    if (payload.state) {
+      setPendingAuthState(payload.state);
+    }
+
+    if (!payload.url) {
+      throw new Error("Enable Banking non ha restituito l'URL di autorizzazione.");
+    }
+
+    window.location.href = payload.url;
+  } catch (error) {
+    renderInstitutionMessage(error.message || "Non riesco ad avviare il consenso.");
+  }
+}
+
+async function handleAuthCallback() {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+  const error = url.searchParams.get("error");
+  const errorDescription = url.searchParams.get("error_description");
+  const returnedState = url.searchParams.get("state");
+
+  if (!code && !error) {
+    return;
+  }
+
+  if (error) {
+    els.bankApiMessage.textContent = errorDescription || `Autorizzazione interrotta: ${error}`;
+    clearPendingAuthState();
+    url.search = "";
+    window.history.replaceState({}, "", url.toString());
+    return;
+  }
+
+  const expectedState = getPendingAuthState();
+  if (expectedState && returnedState && expectedState !== returnedState) {
+    els.bankApiMessage.textContent = "Lo stato di sicurezza del callback non coincide. Riprova il collegamento.";
+    clearPendingAuthState();
+    url.search = "";
+    window.history.replaceState({}, "", url.toString());
+    return;
+  }
+
+  try {
+    els.bankApiMessage.textContent = "Sto completando la sessione bancaria dopo il consenso...";
+    const response = await fetch("/api/bank/session/complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error || "Completamento sessione non riuscito");
+    }
+
+    const accounts = Array.isArray(payload.accounts) ? payload.accounts : [];
+    const accountCount = accounts.length;
+    els.bankApiTag.textContent = "Collegata";
+    els.bankApiTag.className = "tag positive";
+    els.bankApiMessage.textContent = `Consenso completato. Sessione creata con ${accountCount} account accessibili.`;
+    renderInstitutionMessage(
+      accountCount
+        ? `Collegamento completato. Ho accesso a ${accountCount} account. Il prossimo step sara salvarli in Supabase e sincronizzare movimenti e saldi.`
+        : "Collegamento completato, ma la banca non ha restituito account accessibili in questa fase.",
+    );
+  } catch (authError) {
+    els.bankApiTag.textContent = "Errore";
+    els.bankApiTag.className = "tag negative";
+    els.bankApiMessage.textContent = authError.message || "Non riesco a completare la sessione bancaria.";
+  } finally {
+    clearPendingAuthState();
+    url.search = "";
+    window.history.replaceState({}, "", url.toString());
   }
 }
 
@@ -243,6 +380,15 @@ function bindEvents() {
 
   els.loadBankInstitutions?.addEventListener("click", () => {
     loadBankInstitutions();
+  });
+
+  els.bankInstitutionsList?.addEventListener("click", (event) => {
+    const trigger = event.target.closest(".bank-institution-button");
+    if (!trigger) {
+      return;
+    }
+
+    startBankAuthorization(trigger.dataset.bankName || "");
   });
 
   els.logoutButton?.addEventListener("click", async () => {
