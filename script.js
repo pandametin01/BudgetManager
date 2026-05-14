@@ -1767,13 +1767,13 @@ function calculateMonthStats(month, carryoverActual = 0, carryoverBudget = 0, op
   const billsActual = sum(month.bills, "actual");
   const reservedCategoryRemaining = month.categoryBudgets.reduce((acc, category) => {
     const spent = month.transactions
-      .filter((item) => item.type === "expense" && item.category.toLowerCase() === category.name.toLowerCase())
+      .filter((item) => item.type === "expense" && lowerText(item.category) === lowerText(category.name))
       .reduce((total, item) => total + item.amount, 0);
     return acc + Math.max(0, effectiveCategoryBudget(category, spent) - spent);
   }, 0);
   const expensesBudget = month.categoryBudgets.reduce((acc, category) => {
     const spent = month.transactions
-      .filter((item) => item.type === "expense" && item.category.toLowerCase() === category.name.toLowerCase())
+      .filter((item) => item.type === "expense" && lowerText(item.category) === lowerText(category.name))
       .reduce((total, item) => total + item.amount, 0);
     return acc + effectiveCategoryBudget(category, spent);
   }, 0);
@@ -2297,7 +2297,7 @@ function buildRangeChartContext(startValue, endValue, title, budgetNote) {
   const totalBudgetFromCategories = touchedMonths.reduce((acc, monthEntry) => {
     return acc + monthEntry.categoryBudgets.reduce((monthAcc, item) => {
       const spent = monthEntry.transactions
-        .filter((tx) => tx.type === "expense" && tx.category.toLowerCase() === item.name.toLowerCase())
+        .filter((tx) => tx.type === "expense" && lowerText(tx.category) === lowerText(item.name))
         .reduce((sumSpent, tx) => sumSpent + tx.amount, 0);
       return monthAcc + effectiveCategoryBudget(item, spent);
     }, 0);
@@ -3375,7 +3375,7 @@ function renderCategoryList(month) {
   els.categoryList.innerHTML = month.categoryBudgets
     .map((category) => {
       const spent = month.transactions
-        .filter((item) => item.type === "expense" && item.category.toLowerCase() === category.name.toLowerCase())
+        .filter((item) => item.type === "expense" && lowerText(item.category) === lowerText(category.name))
         .reduce((acc, item) => acc + item.amount, 0);
       const currentBudget = effectiveCategoryBudget(category, spent);
       const ratio = currentBudget > 0 ? Math.min(100, (spent / currentBudget) * 100) : 0;
@@ -3674,7 +3674,7 @@ function renderMovementBankMeta(item) {
 }
 
 function movementMatchesFilter(item) {
-  if (activeCategoryFilter && item.category.toLowerCase() !== activeCategoryFilter.toLowerCase()) {
+  if (activeCategoryFilter && lowerText(item.category) !== lowerText(activeCategoryFilter)) {
     return false;
   }
 
@@ -4265,6 +4265,10 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function lowerText(value) {
+  return String(value ?? "").toLowerCase();
 }
 
 document.body.addEventListener("change", (event) => {
