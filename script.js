@@ -474,17 +474,38 @@ function cloneData(value) {
 function normalizePlannerState(parsed) {
   const base = createDefaultState();
   const source = parsed && typeof parsed === "object" ? parsed : {};
+  const normalizedProfile = { ...base.profile, ...(source.profile || {}) };
+  const normalizedMonths = MONTHS.map((_, index) => {
+    const fallbackMonth = createDefaultMonth(index, Number(normalizedProfile.year) || base.profile.year);
+    const sourceMonth = source.months?.[index] && typeof source.months[index] === "object"
+      ? source.months[index]
+      : {};
+
+    return {
+      ...fallbackMonth,
+      ...sourceMonth,
+      incomes: Array.isArray(sourceMonth.incomes) ? sourceMonth.incomes : fallbackMonth.incomes,
+      bills: Array.isArray(sourceMonth.bills) ? sourceMonth.bills : fallbackMonth.bills,
+      categoryBudgets: Array.isArray(sourceMonth.categoryBudgets) ? sourceMonth.categoryBudgets : fallbackMonth.categoryBudgets,
+      transactions: Array.isArray(sourceMonth.transactions) ? sourceMonth.transactions : fallbackMonth.transactions,
+    };
+  });
+
+  const selectedMonthNumber = Number(normalizedProfile.selectedMonth);
+  normalizedProfile.selectedMonth = Number.isInteger(selectedMonthNumber)
+    && selectedMonthNumber >= 0
+    && selectedMonthNumber < normalizedMonths.length
+    ? selectedMonthNumber
+    : Math.min(base.profile.selectedMonth, normalizedMonths.length - 1);
+
   return {
     ...base,
     ...source,
-    profile: { ...base.profile, ...(source.profile || {}) },
-    months: MONTHS.map((_, index) => ({
-      ...createDefaultMonth(index, source.profile?.year || base.profile.year),
-      ...(source.months?.[index] || {}),
-    })),
-    investments: source.investments || base.investments,
-    savingsGoals: source.savingsGoals || [],
-    debtGoals: source.debtGoals || [],
+    profile: normalizedProfile,
+    months: normalizedMonths,
+    investments: Array.isArray(source.investments) ? source.investments : base.investments,
+    savingsGoals: Array.isArray(source.savingsGoals) ? source.savingsGoals : [],
+    debtGoals: Array.isArray(source.debtGoals) ? source.debtGoals : [],
   };
 }
 
@@ -915,7 +936,20 @@ function saveState() {
 }
 
 function getSelectedMonth() {
-  return state.months[state.profile.selectedMonth];
+  const selectedMonthIndex = Number(state?.profile?.selectedMonth);
+  if (Array.isArray(state?.months) && state.months[selectedMonthIndex]) {
+    return state.months[selectedMonthIndex];
+  }
+
+  const fallbackMonth = Array.isArray(state?.months) && state.months.length
+    ? state.months[0]
+    : createDefaultMonth(0, new Date().getFullYear());
+
+  if (state?.profile) {
+    state.profile.selectedMonth = 0;
+  }
+
+  return fallbackMonth;
 }
 
 function monthKey(month) {
