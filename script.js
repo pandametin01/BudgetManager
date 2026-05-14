@@ -3644,6 +3644,7 @@ function renderAllMovements() {
                 placeholder="Aggiungi o modifica nota"
                 aria-label="Nota movimento"
               />
+              ${renderMovementBankMeta(item)}
             </div>
             <div class="movement-actions">
               <button class="secondary" data-action="${deleteAction}" data-id="${item.id}">Elimina</button>
@@ -3653,6 +3654,23 @@ function renderAllMovements() {
       })
       .join("")}
   `;
+}
+
+function renderMovementBankMeta(item) {
+  const rows = [
+    item.creditorName ? `<span><strong>Creditor:</strong> ${escapeHtml(item.creditorName)}</span>` : "",
+    item.debtorName ? `<span><strong>Debtor:</strong> ${escapeHtml(item.debtorName)}</span>` : "",
+    item.bankEntryReference ? `<span><strong>Entry ref:</strong> ${escapeHtml(item.bankEntryReference)}</span>` : "",
+    item.bankTransactionId ? `<span><strong>Transaction ID:</strong> ${escapeHtml(item.bankTransactionId)}</span>` : "",
+    item.bankExternalId ? `<span><strong>External ID:</strong> ${escapeHtml(item.bankExternalId)}</span>` : "",
+    item.bankDirection ? `<span><strong>Direzione:</strong> ${escapeHtml(item.bankDirection)}</span>` : "",
+  ].filter(Boolean);
+
+  if (!rows.length) {
+    return "";
+  }
+
+  return `<div class="movement-bank-meta">${rows.join("")}</div>`;
 }
 
 function movementMatchesFilter(item) {

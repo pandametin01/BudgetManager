@@ -415,6 +415,14 @@ function renderMissingTransactionsPreview() {
             Affidabilita match: <strong>${escapeHtml(item.matchReliabilityLabel || "Stimata")}</strong>
             ${item.timeMissingFromBank ? " · Ora non disponibile dalla banca" : ""}
           </p>
+          <div class="bank-meta-grid">
+            <p><strong>Creditor:</strong> ${escapeHtml(item.creditorName || "—")}</p>
+            <p><strong>Debtor:</strong> ${escapeHtml(item.debtorName || "—")}</p>
+            <p><strong>Entry ref:</strong> ${escapeHtml(item.entryReference || "—")}</p>
+            <p><strong>Transaction ID:</strong> ${escapeHtml(item.transactionId || "—")}</p>
+            <p><strong>External ID usato:</strong> ${escapeHtml(item.externalTransactionId || "—")}</p>
+            <p><strong>Direzione:</strong> ${escapeHtml(item.directionLabel || "—")}</p>
+          </div>
           <div class="bank-preview-grid">
             <label>
               Data
@@ -1084,6 +1092,11 @@ async function loadMissingBankTransactionsPreview() {
           amount: normalizedAmount,
           note,
           currency: amountInfo.currency,
+          creditorName: transaction?.creditor?.name || transaction?.creditor_name || "",
+          debtorName: transaction?.debtor?.name || transaction?.debtor_name || "",
+          entryReference: transaction?.entry_reference || "",
+          transactionId: transaction?.transaction_id || "",
+          directionLabel: String(transaction?.credit_debit_indicator || "").toUpperCase() === "CRDT" ? "Credito" : String(transaction?.credit_debit_indicator || "").toUpperCase() === "DBIT" ? "Debito" : "N/D",
           rawPayload: transaction,
           timeMissingFromBank: !timePart,
           matchReliability: hasEntryReference ? "high" : hasReadableLabel ? "medium" : "low",
@@ -1159,6 +1172,12 @@ async function insertMissingBankTransactions() {
         category: item.category || (item.type === "income" ? "Entrate" : "Varie"),
         amount: Number(item.amount || 0),
         note: item.note || item.bankLabel || "Movimento bancario",
+        creditorName: item.creditorName || "",
+        debtorName: item.debtorName || "",
+        bankExternalId: item.externalTransactionId || "",
+        bankEntryReference: item.entryReference || "",
+        bankTransactionId: item.transactionId || "",
+        bankDirection: item.directionLabel || "",
       });
 
       insertedRows.push({
