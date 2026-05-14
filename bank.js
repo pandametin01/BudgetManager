@@ -26,11 +26,21 @@ const els = {
   bankApiMessage: document.getElementById("bankApiMessage"),
   loadBankInstitutions: document.getElementById("loadBankInstitutions"),
   bankInstitutionsList: document.getElementById("bankInstitutionsList"),
+  loadRecentTransactions: document.getElementById("loadRecentTransactions"),
+  bankConnectionTag: document.getElementById("bankConnectionTag"),
+  bankConnectedInstitution: document.getElementById("bankConnectedInstitution"),
+  bankConnectedSession: document.getElementById("bankConnectedSession"),
+  bankAccountSelect: document.getElementById("bankAccountSelect"),
+  bankConnectionMessage: document.getElementById("bankConnectionMessage"),
+  bankTransactionsTag: document.getElementById("bankTransactionsTag"),
+  bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
+  bankTransactionsList: document.getElementById("bankTransactionsList"),
 };
 
 let supabaseClient = null;
 let supabaseSession = null;
 let availableInstitutions = [];
+let linkedBankSession = null;
 
 bootstrap();
 
@@ -38,6 +48,7 @@ async function bootstrap() {
   await initializeSupabase();
   bindEvents();
   updateUsername();
+  restoreLinkedBankSession();
   await refreshBankConfig();
   await handleAuthCallback();
 }
@@ -131,6 +142,71 @@ function getPendingAuthState() {
 
 function clearPendingAuthState() {
   sessionStorage.removeItem(getAuthStateStorageKey());
+}
+
+function getLinkedBankSessionStorageKey() {
+  const username = getCurrentUsername() || "guest";
+  return `budget-bank-session:${username}`;
+}
+
+function saveLinkedBankSession(sessionData) {
+  linkedBankSession = sessionData;
+  localStorage.setItem(getLinkedBankSessionStorageKey(), JSON.stringify(sessionData));
+  renderLinkedBankSession();
+}
+
+function restoreLinkedBankSession() {
+  try {
+    const raw = localStorage.getItem(getLinkedBankSessionStorageKey());
+    linkedBankSession = raw ? JSON.parse(raw) : null;
+  } catch {
+    linkedBankSession = null;
+  }
+  renderLinkedBankSession();
+}
+
+function renderLinkedBankSession() {
+  const accounts = Array.isArray(linkedBankSession?.accounts) ? linkedBankSession.accounts : [];
+  if (!linkedBankSession) {
+    els.bankConnectionTag.textContent = "Nessuna";
+    els.bankConnectionTag.className = "tag";
+    els.bankConnectedInstitution.textContent = "-";
+    els.bankConnectedSession.textContent = "-";
+    els.bankConnectionMessage.textContent =
+      "Dopo il consenso salvero qui la sessione collegata e potrai usare questo blocco per testare le transazioni reali.";
+    if (els.bankAccountSelect) {
+      els.bankAccountSelect.innerHTML = `<option value="">Nessun account disponibile</option>`;
+    }
+    return;
+  }
+
+  els.bankConnectionTag.textContent = "Collegata";
+  els.bankConnectionTag.className = "tag positive";
+  els.bankConnectedInstitution.textContent = linkedBankSession.institutionName || "-";
+  els.bankConnectedSession.textContent = linkedBankSession.sessionId || "-";
+  els.bankConnectionMessage.textContent = `Sessione collegata il ${new Date(linkedBankSession.connectedAt || Date.now()).toLocaleString("it-IT")}.`;
+
+  if (els.bankAccountSelect) {
+    if (!accounts.length) {
+      els.bankAccountSelect.innerHTML = `<option value="">Nessun account disponibile</option>`;
+      return;
+    }
+
+    els.bankAccountSelect.innerHTML = accounts
+      .map((account, index) => {
+        const accountUid = escapeHtml(account.uid || "");
+        const label = escapeHtml(describeBankAccount(account, index));
+        return `<option value="${accountUid}">${label}</option>`;
+      })
+      .join("");
+  }
+}
+
+function describeBankAccount(account, index) {
+  const accountId = account?.account_id || {};
+  const iban = accountId.iban || accountId.identification || "";
+  const genericId = Array.isArray(account?.all_account_ids) && account.all_account_ids.length ? account.all_account_ids[0]?.identification : "";
+  return iban || genericId || `Conto ${index + 1}`;
 }
 
 async function refreshBankConfig() {
@@ -350,6 +426,12 @@ async function handleAuthCallback() {
 
     const accounts = Array.isArray(payload.accounts) ? payload.accounts : [];
     const accountCount = accounts.length;
+    saveLinkedBankSession({
+      sessionId: payload.session_id || "",
+      institutionName: payload.aspsp?.name || "Istituto collegato",
+      connectedAt: new Date().toISOString(),
+      accounts,
+    });
     els.bankApiTag.textContent = "Collegata";
     els.bankApiTag.className = "tag positive";
     els.bankApiMessage.textContent = `Consenso completato. Sessione creata con ${accountCount} account accessibili.`;
@@ -369,6 +451,134 @@ async function handleAuthCallback() {
   }
 }
 
+function normalizeTransactionAmount(transaction) {
+  const amountSource =
+    transaction?.transaction_amount ||
+    transaction?.proprietary_bank_transaction_code?.transaction_amount ||
+    transaction?.amount ||
+    transaction?.balance_after_transaction?.balance_amount;
+  const amount = Number.parseFloat(amountSource?.amount ?? amountSource?.value ?? "0");
+  const currency = amountSource?.currency || "EUR";
+  const indicator = String(transaction?.credit_debit_indicator || transaction?.direction || "").toUpperCase();
+  return {
+    amount: indicator === "DBIT" ? -Math.abs(amount) : indicator === "CRDT" ? Math.abs(amount) : amount,
+    currency,
+  };
+}
+
+function normalizeTransactionDate(transaction) {
+  return (
+    transaction?.booking_date_time ||
+    transaction?.value_date_time ||
+    transaction?.booking_date ||
+    transaction?.value_date ||
+    transaction?.status_update_date_time ||
+    ""
+  );
+}
+
+function normalizeTransactionLabel(transaction) {
+  const remittance = transaction?.remittance_information;
+  const remittanceText = Array.isArray(remittance?.unstructured)
+    ? remittance.unstructured.join(" ")
+    : remittance?.unstructured || remittance?.reference || "";
+  return (
+    transaction?.creditor_name ||
+    transaction?.debtor_name ||
+    transaction?.merchant_name ||
+    remittanceText ||
+    transaction?.entry_reference ||
+    transaction?.transaction_id ||
+    "Movimento bancario"
+  );
+}
+
+function renderRecentTransactions(transactions) {
+  if (!els.bankTransactionsList) {
+    return;
+  }
+
+  if (!transactions.length) {
+    els.bankTransactionsList.innerHTML = `
+      <article class="list-item">
+        <p class="list-meta">Nessuna transazione trovata negli ultimi 5 giorni per il conto selezionato.</p>
+      </article>
+    `;
+    return;
+  }
+
+  els.bankTransactionsList.innerHTML = transactions
+    .map((transaction) => {
+      const amount = normalizeTransactionAmount(transaction);
+      const signedAmount = Number.isFinite(amount.amount) ? amount.amount : 0;
+      const amountClass = signedAmount < 0 ? "amount-negative" : "amount-positive";
+      const amountText = `${signedAmount < 0 ? "-" : "+"}${Math.abs(signedAmount).toFixed(2)} ${escapeHtml(amount.currency)}`;
+      const dateText = normalizeTransactionDate(transaction);
+      const title = normalizeTransactionLabel(transaction);
+      const status = escapeHtml(transaction?.status || "BOOK");
+      return `
+        <article class="list-item">
+          <div class="list-item-top">
+            <h5>${escapeHtml(title)}</h5>
+            <strong class="${amountClass}">${amountText}</strong>
+          </div>
+          <p class="list-meta">${escapeHtml(dateText || "Data non disponibile")}</p>
+          <p class="list-meta">Status: ${status}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function loadRecentTransactions() {
+  if (!linkedBankSession?.sessionId) {
+    els.bankTransactionsTag.textContent = "Nessuna sessione";
+    els.bankTransactionsTag.className = "tag negative";
+    els.bankTransactionsMessage.textContent = "Prima completa il consenso della banca, poi potro leggere i movimenti.";
+    return;
+  }
+
+  const accountUid = els.bankAccountSelect?.value || linkedBankSession?.accounts?.[0]?.uid || "";
+  if (!accountUid) {
+    els.bankTransactionsTag.textContent = "Nessun conto";
+    els.bankTransactionsTag.className = "tag negative";
+    els.bankTransactionsMessage.textContent = "Non ho un account selezionato da interrogare.";
+    return;
+  }
+
+  try {
+    els.bankTransactionsTag.textContent = "Caricamento...";
+    els.bankTransactionsTag.className = "tag";
+    els.bankTransactionsMessage.textContent = "Sto leggendo le transazioni degli ultimi 5 giorni dal conto collegato.";
+    const response = await fetch("/api/bank/transactions/recent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sessionId: linkedBankSession.sessionId,
+        accountUid,
+        days: 5,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error || "Test transazioni non riuscito");
+    }
+
+    const transactions = Array.isArray(payload.transactions) ? payload.transactions : [];
+    renderRecentTransactions(transactions);
+    els.bankTransactionsTag.textContent = "Ok";
+    els.bankTransactionsTag.className = "tag positive";
+    els.bankTransactionsMessage.textContent = `Ho trovato ${transactions.length} movimenti negli ultimi 5 giorni sul conto selezionato.`;
+  } catch (error) {
+    els.bankTransactionsTag.textContent = "Errore";
+    els.bankTransactionsTag.className = "tag negative";
+    els.bankTransactionsMessage.textContent = error.message || "Non riesco a leggere le transazioni recenti.";
+    renderRecentTransactions([]);
+  }
+}
+
 function bindEvents() {
   els.refreshBankStatus?.addEventListener("click", () => {
     refreshBankConfig();
@@ -380,6 +590,10 @@ function bindEvents() {
 
   els.loadBankInstitutions?.addEventListener("click", () => {
     loadBankInstitutions();
+  });
+
+  els.loadRecentTransactions?.addEventListener("click", () => {
+    loadRecentTransactions();
   });
 
   els.bankInstitutionsList?.addEventListener("click", (event) => {

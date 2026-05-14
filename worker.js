@@ -198,12 +198,95 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/bank/transactions/recent" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const accountUid = body?.accountUid;
+        if (!accountUid) {
+          throw new Error("Account UID mancante.");
+        }
+
+        const days = Number.parseInt(body?.days, 10);
+        const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 30) : 5;
+        const now = new Date();
+        const from = new Date(now.getTime() - safeDays * 24 * 60 * 60 * 1000);
+        const dateFrom = formatIsoDate(from);
+        const dateTo = formatIsoDate(now);
+        const transactions = await fetchAllRecentTransactions(env, accountUid, dateFrom, dateTo);
+
+        return Response.json(
+          {
+            accountUid,
+            dateFrom,
+            dateTo,
+            transactions,
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      } catch (error) {
+        return Response.json(
+          {
+            error: error.message || "Enable Banking recent transactions failed",
+          },
+          {
+            status: 500,
+            headers: {
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
 
 async function fetchEnableBankingApplication(env) {
   return callEnableBankingApi(env, "/application");
+}
+
+async function fetchAllRecentTransactions(env, accountUid, dateFrom, dateTo) {
+  const transactions = [];
+  let continuationKey = "";
+  let remainingPages = 12;
+
+  while (remainingPages > 0) {
+    const params = new URLSearchParams({
+      date_from: dateFrom,
+      date_to: dateTo,
+    });
+    if (continuationKey) {
+      params.set("continuation_key", continuationKey);
+    }
+
+    const response = await callEnableBankingApi(env, `/accounts/${encodeURIComponent(accountUid)}/transactions?${params.toString()}`);
+    const batch = extractTransactions(response);
+    transactions.push(...batch);
+
+    continuationKey = response?.continuation_key || response?.continuationKey || "";
+    if (!continuationKey) {
+      break;
+    }
+
+    remainingPages -= 1;
+  }
+
+  return transactions;
+}
+
+function extractTransactions(response) {
+  if (Array.isArray(response?.transactions)) {
+    return response.transactions;
+  }
+  if (Array.isArray(response?._embedded?.transactions)) {
+    return response._embedded.transactions;
+  }
+  return [];
 }
 
 async function callEnableBankingApi(env, path, init = {}) {
@@ -308,4 +391,11 @@ function base64UrlEncodeBytes(bytes) {
   });
 
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function formatIsoDate(value) {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
