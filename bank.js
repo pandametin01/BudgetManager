@@ -482,7 +482,9 @@ function renderMissingTransactionsPreview() {
             </label>
             <label>
               Categoria
-              <input type="text" class="bank-preview-category" data-preview-index="${index}" value="${escapeHtml(item.category || "")}" list="bank-preview-categories" />
+              <select class="bank-preview-category" data-preview-index="${index}">
+                ${renderPreviewCategoryOptions(item.type, item.category || "")}
+              </select>
             </label>
             <label>
               Importo
@@ -500,11 +502,6 @@ function renderMissingTransactionsPreview() {
     })
     .join("");
 
-  if (!document.getElementById("bank-preview-categories")) {
-    const dataList = document.createElement("datalist");
-    dataList.id = "bank-preview-categories";
-    document.body.appendChild(dataList);
-  }
 }
 
 function renderBankDebugBox(item) {
@@ -561,20 +558,26 @@ function renderPreviewTypeOptions(selectedType) {
     .join("");
 }
 
+function renderPreviewCategoryOptions(selectedType, selectedCategory) {
+  const optionsByType = {
+    expense: [...DEFAULT_BANK_CATEGORIES],
+    income: ["Entrate"],
+    saving: ["Risparmi"],
+    debt: ["Debiti"],
+  };
+
+  const baseOptions = optionsByType[selectedType] || [...DEFAULT_BANK_CATEGORIES];
+  const mergedOptions = [...new Set([...baseOptions, selectedCategory].filter(Boolean))];
+
+  return mergedOptions
+    .map((category) => `<option value="${escapeHtml(category)}" ${category === selectedCategory ? "selected" : ""}>${escapeHtml(category)}</option>`)
+    .join("");
+}
+
 function buildPlannerCategorySuggestions(plannerState) {
   const budgetCategories = (plannerState?.months || []).flatMap((month) => (month.categoryBudgets || []).map((item) => item.name));
   const movementCategories = (plannerState?.months || []).flatMap((month) => (month.transactions || []).map((item) => item.category));
   return [...new Set([...DEFAULT_BANK_CATEGORIES, ...budgetCategories, ...movementCategories].filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
-}
-
-function refreshCategoryDatalist(categories) {
-  let dataList = document.getElementById("bank-preview-categories");
-  if (!dataList) {
-    dataList = document.createElement("datalist");
-    dataList.id = "bank-preview-categories";
-    document.body.appendChild(dataList);
-  }
-  dataList.innerHTML = categories.map((category) => `<option value="${escapeHtml(category)}"></option>`).join("");
 }
 
 async function refreshBankConfig() {
@@ -1245,7 +1248,6 @@ async function loadMissingBankTransactionsPreview() {
 
     const plannerState = plannerRow?.planner_state || { months: [] };
     const plannerCategories = buildPlannerCategorySuggestions(plannerState);
-    refreshCategoryDatalist(plannerCategories);
     const plannerLinkState = collectPlannerBankLinkState(plannerState);
     const importedExternalIds = new Set(
       (importedRowsResult.data || [])
