@@ -140,6 +140,8 @@ const els = {
   debtCount: document.getElementById("debtCount"),
   transactionCategorySelect: document.getElementById("transactionCategorySelect"),
   profileForm: document.getElementById("profileForm"),
+  passwordForm: document.getElementById("passwordForm"),
+  passwordStatus: document.getElementById("passwordStatus"),
   backupForm: document.getElementById("backupForm"),
   backupFileInput: document.getElementById("backupFileInput"),
   backupStatus: document.getElementById("backupStatus"),
@@ -628,6 +630,14 @@ function setBackupStatus(message, tone = "") {
   }
   els.backupStatus.textContent = message || "";
   els.backupStatus.className = tone ? `list-meta ${tone}` : "list-meta";
+}
+
+function setPasswordStatus(message, tone = "") {
+  if (!els.passwordStatus) {
+    return;
+  }
+  els.passwordStatus.textContent = message || "";
+  els.passwordStatus.className = tone ? `list-meta ${tone}` : "list-meta";
 }
 
 function createBackupPayload() {
@@ -1388,6 +1398,45 @@ function bindForms() {
     saveState();
     renderMonthOptions();
     render();
+  });
+
+  els.passwordForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    (async () => {
+      const data = new FormData(event.currentTarget);
+      const newPassword = String(data.get("newPassword") || "");
+      const confirmPassword = String(data.get("confirmPassword") || "");
+      const username = getCurrentUsername();
+
+      setPasswordStatus("");
+
+      if (newPassword.length < 3) {
+        setPasswordStatus("Scegli una password di almeno 3 caratteri.", "negative");
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordStatus("Le password non coincidono.", "negative");
+        return;
+      }
+
+      if (isSupabaseEnabled() && supabaseSession?.user) {
+        const result = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (result.error) {
+          setPasswordStatus(result.error.message || "Aggiornamento password non riuscito.", "negative");
+          return;
+        }
+      }
+
+      const accounts = getAccounts();
+      if (accounts[username]) {
+        accounts[username].password = newPassword;
+        saveAccounts(accounts);
+      }
+
+      setPasswordStatus("Password aggiornata correttamente.", "positive");
+      event.currentTarget.reset();
+    })();
   });
 
   els.backupFileInput?.addEventListener("change", async (event) => {
