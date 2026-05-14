@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget Planner Completo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <div class="login-grid">
+        <form id="loginForm" class="login-card">
+          <p class="eyebrow">Accesso planner</p>
+          <h2>Login</h2>
+          <p class="hero-text">Continua pure a usare username e password. I dati attuali sono assegnati all'utente <strong>mattia</strong>.</p>
+          <label>
+            Username
+            <input name="username" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <p id="loginError" class="negative"></p>
+          <button class="primary" type="submit">Entra</button>
+        </form>
+
+        <form id="registerForm" class="login-card">
+          <p class="eyebrow">Nuovo accesso</p>
+          <h2>Registrazione</h2>
+          <p class="hero-text">Crea un altro utente con salvataggi separati dal profilo di Mattia.</p>
+          <label>
+            Username
+            <input name="username" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="new-password" required />
+          </label>
+          <label>
+            Conferma password
+            <input name="confirmPassword" type="password" autocomplete="new-password" required />
+          </label>
+          <p id="registerError" class="negative"></p>
+          <p id="registerSuccess" class="positive"></p>
+          <button class="primary" type="submit">Registrati</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="pageShell" class="page-shell hidden-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">BP</span>
+          <div>
+            <p>Planner budget</p>
+            <h1>Vista annuale</h1>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="#dashboard">Dashboard</a>
+          <a href="#runway">Statistiche</a>
+          <a href="#annual">Panoramica</a>
+          <a href="#charts">Grafici</a>
+          <a href="#planner">Piano mensile</a>
+          <a href="#transactions">Movimenti</a>
+          <a href="#investments">Investimenti</a>
+          <a href="#goals">Obiettivi</a>
+        </nav>
+
+        <section class="sidebar-card">
+          <p class="eyebrow">Snapshot</p>
+          <div id="sidebarSnapshot" class="sidebar-stats"></div>
+        </section>
+
+        <section class="sidebar-card sidebar-illustration">
+          <img src="./assets/finance-scene.svg" alt="Illustrazione planner budget" />
+          <p>Un planner unico per gestire mesi, routine e obiettivi nello stesso spazio.</p>
+        </section>
+      </aside>
+
+      <main class="content">
+        <div class="content-topbar">
+          <p class="session-pill">Utente: <strong id="currentUsername">mattia</strong></p>
+          <button class="secondary" type="button" data-action="logout">Esci</button>
+        </div>
+
+        <section class="panel kpi-panel" id="dashboard">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h3>Indicatori principali</h3>
+            </div>
+            <div class="month-switcher">
+              <label for="selectedMonth">Mese attivo</label>
+              <select id="selectedMonth"></select>
+            </div>
+          </div>
+          <div id="kpiGrid" class="kpi-grid"></div>
+        </section>
+
+        <section class="panel runway-panel" id="runway">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Statistiche utili</p>
+              <h3>Quanto puoi spendere fino a una data finale</h3>
+            </div>
+            <div class="archive-tools">
+              <label>
+                <span class="label-small">Data finale</span>
+                <input id="runwayEndDate" type="date" />
+              </label>
+            </div>
+          </div>
+          <div id="runwayStats" class="kpi-grid"></div>
+        </section>
+
+        <section class="panel annual-panel" id="annual">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Anno completo</p>
+              <h3>Panoramica di tutti i mesi</h3>
+            </div>
+            <div class="archive-tools">
+              <div class="pill-note">Budget vs actual aggiornato in tempo reale</div>
+              <label>
+                <span class="label-small">Anno panoramica</span>
+                <select id="annualYearFilter"></select>
+              </label>
+            </div>
+          </div>
+          <div id="annualCards" class="annual-cards"></div>
+        </section>
+
+        <section class="panel charts-panel" id="charts">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Grafici</p>
+              <h3>Grafico cartesiano complessivo</h3>
+            </div>
+            <div class="archive-tools">
+              <label>
+                <span class="label-small">Base grafico</span>
+                <select id="chartScopeSelect">
+                  <option value="month" selected>Mese selezionato</option>
+                  <option value="year">Anno</option>
+                  <option value="custom">Periodo personalizzato</option>
+                </select>
+              </label>
+              <label>
+                <span class="label-small">Anno</span>
+                <select id="chartYearSelect"></select>
+              </label>
+              <label>
+                <span class="label-small">Vista grafico</span>
+                <select id="chartViewSelect">
+                  <option value="month" selected>Mensile</option>
+                  <option value="day">Giornaliera</option>
+                  <option value="period">Periodo</option>
+                </select>
+              </label>
+              <label>
+                <span class="label-small">Giorno da aprire</span>
+                <input id="chartDayPicker" type="datetime-local" step="1800" />
+              </label>
+              <label>
+                <span class="label-small">Da</span>
+                <input id="chartPeriodStartPicker" type="datetime-local" step="1800" />
+              </label>
+              <label>
+                <span class="label-small">A</span>
+                <input id="chartPeriodEndPicker" type="datetime-local" step="1800" />
+              </label>
+              <div class="pill-note">Shift + trascina per zoomare un periodo</div>
+              <button class="secondary" type="button" data-action="reset-chart-zoom">Reset zoom</button>
+            </div>
+          </div>
+          <div id="budgetCharts" class="budget-charts"></div>
+        </section>
+
+        <section class="panel" id="planner">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Impostazioni e budget</p>
+              <h3>Configura profilo e mese selezionato</h3>
+            </div>
+            <button class="primary" data-action="jump-category-form">Aggiungi categoria</button>
+          </div>
+
+          <div class="form-grid settings-grid">
+            <form id="profileForm" class="card-form">
+              <h4>Profilo planner</h4>
+              <label>
+                Nome
+                <input name="name" type="text" placeholder="Mattia" />
+              </label>
+              <label>
+                Valuta
+                <input name="currency" type="text" maxlength="3" placeholder="EUR" />
+              </label>
+              <label>
+                Anno
+                <input name="year" type="number" min="2024" max="2035" />
+              </label>
+              <label>
+                Saldo iniziale
+                <input name="startBalance" type="number" step="0.01" />
+              </label>
+              <button class="primary" type="submit">Salva profilo</button>
+            </form>
+
+            <form id="incomeForm" class="card-form">
+              <h4>Aggiungi entrata budget</h4>
+              <label>
+                Voce
+                <input name="name" type="text" placeholder="Stipendio" required />
+              </label>
+              <label>
+                Budget
+                <input name="budget" type="number" step="0.01" required />
+              </label>
+              <label>
+                Actual
+                <input name="actual" type="number" step="0.01" />
+              </label>
+              <label>
+                Data entrata
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Ora entrata
+                <input name="time" type="time" />
+              </label>
+              <button class="primary" type="submit">Aggiungi entrata</button>
+            </form>
+
+            <form id="billForm" class="card-form">
+              <h4>Aggiungi bolletta ricorrente</h4>
+              <label>
+                Nome
+                <input name="name" type="text" placeholder="Netflix" required />
+              </label>
+              <label>
+                Scadenza
+                <input name="dueDay" type="number" min="1" max="31" required />
+              </label>
+              <label>
+                Budget
+                <input name="budget" type="number" step="0.01" required />
+              </label>
+              <label>
+                Actual
+                <input name="actual" type="number" step="0.01" />
+              </label>
+              <button class="primary" type="submit">Aggiungi bill</button>
+            </form>
+
+            <form id="categoryForm" class="card-form category-form-card">
+              <h4>Nuova categoria spese</h4>
+              <p class="form-helper">Crea una categoria nuova che poi puoi usare anche nei movimenti.</p>
+              <label>
+                Categoria
+                <input name="name" type="text" placeholder="Food & Drink" required />
+              </label>
+              <label>
+                Budget mese
+                <input name="budget" type="number" step="0.01" required />
+              </label>
+              <label class="checkbox-inline">
+                <input name="isUndefinedBudget" type="checkbox" />
+                Budget indefinito
+              </label>
+              <button class="primary" type="submit">Aggiungi categoria</button>
+            </form>
+          </div>
+
+          <div class="dual-columns planner-columns">
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Entrate del mese</h4>
+                <span id="incomeCount" class="tag"></span>
+              </div>
+              <div id="incomeList" class="list-stack"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Bills del mese</h4>
+                <span id="billCount" class="tag"></span>
+              </div>
+              <div id="billList" class="list-stack"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel ledger-panel" id="transactions">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Movimenti reali</p>
+              <h3>Registro spese, entrate, risparmi e debiti</h3>
+            </div>
+            <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="transactions" aria-expanded="true" aria-label="Apri o chiudi pannello movimenti">›</button>
+          </div>
+          <div class="panel-collapsible-content">
+          <div class="form-grid ledger-grid">
+            <form id="transactionForm" class="card-form wide-form">
+              <h4>Nuovo movimento</h4>
+              <label>
+                Data
+                <input name="date" type="date" required />
+              </label>
+              <label>
+                Ora
+                <input name="time" type="time" />
+              </label>
+              <label>
+                Tipo
+                <select name="type">
+                  <option value="expense">Spesa</option>
+                  <option value="income">Entrata extra</option>
+                  <option value="saving">Versamento risparmio</option>
+                  <option value="debt">Pagamento debito</option>
+                </select>
+              </label>
+              <label>
+                Categoria / goal
+                <select name="category" id="transactionCategorySelect" required></select>
+              </label>
+              <label>
+                Importo
+                <input name="amount" type="number" step="0.01" required />
+              </label>
+              <label class="wide">
+                Nota
+                <input name="note" type="text" placeholder="Dettaglio utile" />
+              </label>
+              <div class="wide inline-actions">
+                <button class="secondary" type="button" data-action="jump-category-form">Nuova categoria</button>
+                <button class="primary" type="submit">Registra movimento</button>
+              </div>
+            </form>
+
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Categorie del mese</h4>
+                <span id="categoryCount" class="tag"></span>
+              </div>
+              <div id="categoryList" class="list-stack"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Movimenti recenti</h4>
+                <span id="transactionCount" class="tag"></span>
+              </div>
+              <div id="transactionList" class="list-stack"></div>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        <section class="panel movements-panel" id="movement-archive">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Archivio movimenti</p>
+              <h3>Tutti i movimenti con tag modificabile</h3>
+            </div>
+            <div class="archive-tools">
+              <span id="activeCategoryFilter" class="pill-note">Filtro: tutte le categorie</span>
+              <button class="secondary" data-action="clear-category-filter">Mostra tutto</button>
+              <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="movement-archive" aria-expanded="true" aria-label="Apri o chiudi archivio movimenti">›</button>
+            </div>
+          </div>
+          <div class="panel-collapsible-content">
+          <div class="archive-filters">
+            <label>
+              Vista
+              <select id="movementFilterMode">
+                <option value="selected-month">Mese selezionato</option>
+                <option value="date-range">Periodo personalizzato</option>
+                <option value="all">Tutti i movimenti</option>
+              </select>
+            </label>
+            <label>
+              Dal
+              <input id="movementFilterStart" type="date" />
+            </label>
+            <label>
+              Al
+              <input id="movementFilterEnd" type="date" />
+            </label>
+            <label>
+              Tipologia
+              <select id="movementFilterType">
+                <option value="all">Tutte</option>
+                <option value="expense">Spese</option>
+                <option value="income">Entrate</option>
+                <option value="saving">Risparmi</option>
+                <option value="debt">Debiti</option>
+              </select>
+            </label>
+            <label>
+              Categoria
+              <select id="movementFilterCategory">
+                <option value="all">Tutte le categorie</option>
+              </select>
+            </label>
+            <label>
+              Importo minimo
+              <input id="movementFilterMinAmount" type="number" min="0" step="0.01" placeholder="0" />
+            </label>
+            <label>
+              Importo massimo
+              <input id="movementFilterMaxAmount" type="number" min="0" step="0.01" placeholder="Nessun limite" />
+            </label>
+            <label>
+              Ordina per
+              <select id="movementSortBy">
+                <option value="date-desc">Data più recente</option>
+                <option value="date-asc">Data più vecchia</option>
+                <option value="amount-desc">Importo decrescente</option>
+                <option value="amount-asc">Importo crescente</option>
+                <option value="type-asc">Tipologia</option>
+                <option value="category-asc">Categoria</option>
+              </select>
+            </label>
+          </div>
+          <div id="allMovementsList" class="movements-table"></div>
+          </div>
+        </section>
+
+        <section class="panel investments-panel" id="investments">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Investimenti</p>
+              <h3>Portafoglio crypto con profitti e perdite</h3>
+            </div>
+            <div class="archive-tools">
+              <div id="investmentStatus" class="pill-note">Prezzo live in caricamento</div>
+              <button class="secondary" type="button" data-action="refresh-investments">Aggiorna prezzo</button>
+              <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="investments" aria-expanded="true" aria-label="Apri o chiudi pannello investimenti">›</button>
+            </div>
+          </div>
+          <div class="panel-collapsible-content">
+          <div class="form-grid investment-grid">
+            <form id="investmentTradeForm" class="card-form">
+              <h4>Compra o vendi crypto</h4>
+              <label>
+                Asset
+                <select name="coinId">
+                  <option value="ripple">XRP</option>
+                </select>
+              </label>
+              <label>
+                Operazione
+                <select name="side">
+                  <option value="buy">Compra</option>
+                  <option value="sell">Vendi / preleva</option>
+                </select>
+              </label>
+              <label>
+                Quantita'
+                <input name="quantity" type="number" step="0.0001" min="0" required />
+              </label>
+              <label>
+                Totale euro
+                <input name="total" type="number" step="0.01" min="0" required />
+              </label>
+              <button class="primary" type="submit">Registra operazione</button>
+            </form>
+          </div>
+          <div id="investmentCards" class="investment-cards"></div>
+          </div>
+        </section>
+
+        <section class="panel goals-panel" id="goals">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Goal tracker</p>
+              <h3>Obiettivi di risparmio e debiti</h3>
+            </div>
+            <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="goals" aria-expanded="true" aria-label="Apri o chiudi pannello obiettivi">›</button>
+          </div>
+          <div class="panel-collapsible-content">
+          <div class="form-grid goals-grid">
+            <form id="savingGoalForm" class="card-form">
+              <h4>Nuovo obiettivo risparmio</h4>
+              <label>
+                Nome
+                <input name="name" type="text" placeholder="Vacanza" required />
+              </label>
+              <label>
+                Target
+                <input name="target" type="number" step="0.01" required />
+              </label>
+              <label>
+                Base iniziale
+                <input name="start" type="number" step="0.01" />
+              </label>
+              <button class="primary" type="submit">Aggiungi goal</button>
+            </form>
+
+            <form id="debtGoalForm" class="card-form">
+              <h4>Nuovo debito</h4>
+              <label>
+                Nome
+                <input name="name" type="text" placeholder="Prestito auto" required />
+              </label>
+              <label>
+                Totale debito
+                <input name="target" type="number" step="0.01" required />
+              </label>
+              <label>
+                Debito iniziale già pagato
+                <input name="start" type="number" step="0.01" />
+              </label>
+              <button class="primary" type="submit">Aggiungi debito</button>
+            </form>
+
+            <div class="data-card goals-summary-card">
+              <img src="./assets/savings-scene.svg" alt="Obiettivi di risparmio" />
+              <p>
+                I movimenti con tipo <strong>saving</strong> e <strong>debt</strong> alimentano in automatico i progressi dei goal.
+              </p>
+            </div>
+          </div>
+
+          <div class="dual-columns">
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Risparmi</h4>
+                <span id="savingCount" class="tag"></span>
+              </div>
+              <div id="savingGoalsList" class="progress-list"></div>
+            </div>
+
+            <div class="data-card">
+              <div class="card-title-row">
+                <h4>Debiti</h4>
+                <span id="debtCount" class="tag"></span>
+              </div>
+              <div id="debtGoalsList" class="progress-list"></div>
+            </div>
+          </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <p>Nessun dato ancora. Inizia da qui e il planner costruirà il riepilogo.</p>
+      </div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./n26-merged-seed.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
