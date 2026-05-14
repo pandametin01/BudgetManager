@@ -57,6 +57,7 @@ const els = {
   bankConnectedInstitution: document.getElementById("bankConnectedInstitution"),
   bankConnectedSession: document.getElementById("bankConnectedSession"),
   bankAccountSelect: document.getElementById("bankAccountSelect"),
+  bankLinkedAccountsList: document.getElementById("bankLinkedAccountsList"),
   bankConnectionMessage: document.getElementById("bankConnectionMessage"),
   bankTransactionsTag: document.getElementById("bankTransactionsTag"),
   bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
@@ -237,6 +238,9 @@ function renderLinkedBankSession() {
     if (els.bankAccountSelect) {
       els.bankAccountSelect.innerHTML = `<option value="">Nessun account disponibile</option>`;
     }
+    if (els.bankLinkedAccountsList) {
+      els.bankLinkedAccountsList.innerHTML = `<p class="list-meta">Nessun account collegato visibile.</p>`;
+    }
     return;
   }
 
@@ -249,16 +253,39 @@ function renderLinkedBankSession() {
   if (els.bankAccountSelect) {
     if (!accounts.length) {
       els.bankAccountSelect.innerHTML = `<option value="">Nessun account disponibile</option>`;
-      return;
+    } else {
+      els.bankAccountSelect.innerHTML = accounts
+        .map((account, index) => {
+          const accountUid = escapeHtml(account.uid || "");
+          const label = escapeHtml(describeBankAccount(account, index));
+          return `<option value="${accountUid}">${label}</option>`;
+        })
+        .join("");
     }
+  }
 
-    els.bankAccountSelect.innerHTML = accounts
-      .map((account, index) => {
-        const accountUid = escapeHtml(account.uid || "");
-        const label = escapeHtml(describeBankAccount(account, index));
-        return `<option value="${accountUid}">${label}</option>`;
-      })
-      .join("");
+  if (els.bankLinkedAccountsList) {
+    els.bankLinkedAccountsList.innerHTML = accounts.length
+      ? accounts
+          .map((account, index) => {
+            const accountId = account?.account_id || {};
+            const iban = accountId.iban || accountId.identification || "N/D";
+            const accountUid = account?.uid || "N/D";
+            const providerName = linkedBankSession.institutionName || "Istituto collegato";
+            return `
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>${escapeHtml(providerName)}</h5>
+                  <strong>${escapeHtml(account?.currency || "EUR")}</strong>
+                </div>
+                <p class="list-meta">UID: ${escapeHtml(accountUid)}</p>
+                <p class="list-meta">IBAN / identificativo: ${escapeHtml(iban)}</p>
+                <p class="list-meta">Etichetta conto: ${escapeHtml(describeBankAccount(account, index))}</p>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="list-meta">Nessun account collegato visibile.</p>`;
   }
 }
 
