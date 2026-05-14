@@ -1038,6 +1038,28 @@ function previewMatchesPlannerDuplicate(preview, plannerDuplicateSignatures) {
     .some((text) => plannerDuplicateSignatures.has(createPlannerDuplicateSignatureFromParts(preview.date, preview.amount, text)));
 }
 
+function collectPlannerBankLinkState(plannerState) {
+  const plannerTransactionIds = new Set();
+  const plannerExternalIds = new Set();
+
+  (plannerState?.months || []).forEach((month) => {
+    (month?.transactions || []).forEach((item) => {
+      const transactionId = String(item?.id || "").trim();
+      const externalId = String(item?.bankExternalId || "").trim();
+
+      if (transactionId) {
+        plannerTransactionIds.add(transactionId);
+      }
+
+      if (externalId) {
+        plannerExternalIds.add(externalId);
+      }
+    });
+  });
+
+  return { plannerTransactionIds, plannerExternalIds };
+}
+
 function resolvePreferredCategoryName(category, plannerCategories = []) {
   const aliases = {
     Bonifici: ["Bonifici", "Bonifici privati"],
@@ -1152,7 +1174,7 @@ async function loadMissingBankTransactionsPreview() {
       fetchRemotePlannerRow(),
       supabaseClient
         .from("bank_transactions")
-        .select("external_transaction_id")
+        .select("external_transaction_id, planner_transaction_id")
         .eq("user_id", supabaseSession.user.id),
       fetch("/api/bank/transactions/recent", {
         method: "POST",
@@ -1178,7 +1200,20 @@ async function loadMissingBankTransactionsPreview() {
     const plannerState = plannerRow?.planner_state || { months: [] };
     const plannerCategories = buildPlannerCategorySuggestions(plannerState);
     refreshCategoryDatalist(plannerCategories);
-    const importedExternalIds = new Set((importedRowsResult.data || []).map((row) => row.external_transaction_id));
+    const { plannerTransactionIds, plannerExternalIds } = collectPlannerBankLinkState(plannerState);
+    const importedExternalIds = new Set(
+      (importedRowsResult.data || [])
+        .filter((row) => {
+          const plannerTransactionId = String(row?.planner_transaction_id || "").trim();
+          const externalTransactionId = String(row?.external_transaction_id || "").trim();
+
+          return (
+            (plannerTransactionId && plannerTransactionIds.has(plannerTransactionId))
+            || (externalTransactionId && plannerExternalIds.has(externalTransactionId))
+          );
+        })
+        .map((row) => row.external_transaction_id),
+    );
     const plannerDuplicates = collectPlannerDuplicateSignatures(plannerState);
 
     const bankTransactions = Array.isArray(bankPayload.transactions) ? bankPayload.transactions : [];
