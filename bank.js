@@ -15,6 +15,16 @@ const MONTH_NAMES = [
   "Dicembre",
 ];
 
+const DEFAULT_BANK_CATEGORIES = [
+  "Bonifici",
+  "Food & Drink",
+  "Fun",
+  "Spesa",
+  "Telefono",
+  "Trasporti",
+  "Abbonamenti",
+];
+
 const els = {
   currentUsername: document.getElementById("currentUsername"),
   logoutButton: document.getElementById("logoutButton"),
@@ -50,6 +60,7 @@ const els = {
   bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
   bankTransactionsList: document.getElementById("bankTransactionsList"),
   loadMissingBankTransactions: document.getElementById("loadMissingBankTransactions"),
+  includeAllBankTransactions: document.getElementById("includeAllBankTransactions"),
   excludeAllBankTransactions: document.getElementById("excludeAllBankTransactions"),
   insertMissingBankTransactions: document.getElementById("insertMissingBankTransactions"),
   bankMissingTransactionsMessage: document.getElementById("bankMissingTransactionsMessage"),
@@ -523,7 +534,7 @@ function renderPreviewTypeOptions(selectedType) {
 function buildPlannerCategorySuggestions(plannerState) {
   const budgetCategories = (plannerState?.months || []).flatMap((month) => (month.categoryBudgets || []).map((item) => item.name));
   const movementCategories = (plannerState?.months || []).flatMap((month) => (month.transactions || []).map((item) => item.category));
-  return [...new Set([...budgetCategories, ...movementCategories].filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
+  return [...new Set([...DEFAULT_BANK_CATEGORIES, ...budgetCategories, ...movementCategories].filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
 }
 
 function refreshCategoryDatalist(categories) {
@@ -1027,15 +1038,54 @@ function previewMatchesPlannerDuplicate(preview, plannerDuplicateSignatures) {
     .some((text) => plannerDuplicateSignatures.has(createPlannerDuplicateSignatureFromParts(preview.date, preview.amount, text)));
 }
 
-function suggestCategoryFromTransaction(label, plannerCategories = []) {
-  const normalized = String(label || "").toLowerCase();
+function resolvePreferredCategoryName(category, plannerCategories = []) {
+  const aliases = {
+    Bonifici: ["Bonifici", "Bonifici privati"],
+    "Food & Drink": ["Food & Drink"],
+    Fun: ["Fun"],
+    Spesa: ["Spesa"],
+    Telefono: ["Telefono"],
+    Trasporti: ["Trasporti"],
+    Abbonamenti: ["Abbonamenti"],
+  };
+
+  const candidateNames = aliases[category] || [category];
+  const match = plannerCategories.find((existingCategory) =>
+    candidateNames.some((candidate) => String(existingCategory).toLowerCase() === String(candidate).toLowerCase()));
+
+  return match || category;
+}
+
+function buildCategoryDetectionText(transaction, label) {
+  return [
+    label,
+    transaction?.creditor?.name,
+    transaction?.debtor?.name,
+    transaction?.creditor_name,
+    transaction?.debtor_name,
+    transaction?.counterparty_name,
+    transaction?.ultimate_creditor,
+    transaction?.ultimate_debtor,
+    Array.isArray(transaction?.remittance_information) ? transaction.remittance_information.join(" ") : transaction?.remittance_information,
+    transaction?.transaction_information,
+    transaction?.additional_information,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function suggestCategoryFromTransaction(transaction, label, plannerCategories = []) {
+  const normalized = buildCategoryDetectionText(transaction, label);
   const staticRules = [
-    { pattern: /(deliveroo|mcdonald|mcdonald|bar |caffe|ristor|pub|tavola|eat|restaurant)/i, category: "Food & Drink" },
-    { pattern: /(apple|spotify|netflix|iliad|vodafone|tim|prime|youtube)/i, category: "Abbonamenti" },
-    { pattern: /(trenitalia|taxi|uber|bus|metro|train|autostrade)/i, category: "Trasporti" },
-    { pattern: /(super|market|spesa|conad|coop|esselunga|lidl|carrefour)/i, category: "Spesa" },
-    { pattern: /(charity|benefic|donaz|palio)/i, category: "Beneficenza" },
-    { pattern: /(revolut|bonifico|transfer|friend|private)/i, category: "Bonifici privati" },
+    { pattern: /(deliveroo|mcdonald|bar |caffe|ristor|pub|tavola|eat|restaurant|pizzeria|burger|kebab|calore della tavola)/i, category: "Food & Drink" },
+    { pattern: /(apple|spotify|netflix|prime|youtube|openai|google one|driffle|chatgpt)/i, category: "Abbonamenti" },
+    { pattern: /(iliad|vodafone|tim|wind|very mobile|ho\. mobile)/i, category: "Telefono" },
+    { pattern: /(trenitalia|taxi|uber|bus|metro|train|autostrade|falconara|jesi ss dpr)/i, category: "Trasporti" },
+    { pattern: /(super|market|spesa|conad|coop|esselunga|lidl|carrefour|gala|si con te|macelleria)/i, category: "Spesa" },
+    { pattern: /(hollywood|cerchio|gekabo|sunwave|museika|oscar wilde|vibici|beach|abbronzatissim)/i, category: "Fun" },
+    { pattern: /(bonifico|transfer|ricarica|payment from|inviato da|martino antonio|sarah|gaia|daniel cantarini|perrotta roberto|cristo?ny|private)/i, category: "Bonifici" },
   ];
 
   const existingMatch = plannerCategories.find((category) => normalized.includes(String(category).toLowerCase()));
@@ -1045,10 +1095,10 @@ function suggestCategoryFromTransaction(label, plannerCategories = []) {
 
   const ruleMatch = staticRules.find((rule) => rule.pattern.test(normalized));
   if (ruleMatch) {
-    return plannerCategories.find((category) => String(category).toLowerCase() === ruleMatch.category.toLowerCase()) || ruleMatch.category;
+    return resolvePreferredCategoryName(ruleMatch.category, plannerCategories);
   }
 
-  return plannerCategories[0] || "Varie";
+  return resolvePreferredCategoryName(DEFAULT_BANK_CATEGORIES[0], plannerCategories);
 }
 
 function ensurePlannerMonth(plannerState, dateString) {
@@ -1138,7 +1188,7 @@ async function loadMissingBankTransactionsPreview() {
         const { date: datePart, time: timePart } = extractTransactionDateParts(transaction);
         const note = normalizeTransactionLabel(transaction);
         const type = amountInfo.amount >= 0 ? "income" : "expense";
-        const category = type === "income" ? "Entrate" : suggestCategoryFromTransaction(note, plannerCategories);
+        const category = type === "income" ? "Entrate" : suggestCategoryFromTransaction(transaction, note, plannerCategories);
         const normalizedAmount = Number(Math.abs(amountInfo.amount).toFixed(2));
         const hasEntryReference = Boolean(String(transaction?.entry_reference || "").trim());
         const hasReadableLabel = note !== "Movimento bancario";
@@ -1386,6 +1436,17 @@ function bindEvents() {
 
   els.loadMissingBankTransactions?.addEventListener("click", () => {
     loadMissingBankTransactionsPreview();
+  });
+
+  els.includeAllBankTransactions?.addEventListener("click", () => {
+    pendingBankImports = pendingBankImports.map((item) => ({ ...item, include: true }));
+    renderMissingTransactionsPreview();
+    renderMissingTransactionsMessage(
+      pendingBankImports.length
+        ? `Ho incluso ${pendingBankImports.length} transazioni nella preview.`
+        : "Non ci sono transazioni in anteprima da includere.",
+      pendingBankImports.length ? "positive" : "",
+    );
   });
 
   els.excludeAllBankTransactions?.addEventListener("click", () => {
