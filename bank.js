@@ -49,6 +49,8 @@ const els = {
   bankApiRedirects: document.getElementById("bankApiRedirects"),
   bankApiMessage: document.getElementById("bankApiMessage"),
   loadBankInstitutions: document.getElementById("loadBankInstitutions"),
+  bankInstitutionCountry: document.getElementById("bankInstitutionCountry"),
+  bankInstitutionSearch: document.getElementById("bankInstitutionSearch"),
   bankInstitutionsList: document.getElementById("bankInstitutionsList"),
   loadRecentTransactions: document.getElementById("loadRecentTransactions"),
   bankConnectionTag: document.getElementById("bankConnectionTag"),
@@ -659,31 +661,37 @@ async function verifyBankApiAccess() {
 
 async function loadBankInstitutions() {
   try {
-    renderInstitutionMessage("Sto caricando gli istituti disponibili per il paese IT...");
-    const response = await fetch("/api/bank/aspsps?country=IT&service=AIS", { cache: "no-store" });
+    const country = String(els.bankInstitutionCountry?.value || "IT").trim().toUpperCase() || "IT";
+    const searchTerm = String(els.bankInstitutionSearch?.value || "").trim().toLowerCase();
+    renderInstitutionMessage(`Sto caricando gli istituti disponibili per il paese ${country}...`);
+    const response = await fetch(`/api/bank/aspsps?country=${encodeURIComponent(country)}&service=AIS`, { cache: "no-store" });
     const payload = await response.json();
     if (!response.ok) {
       throw new Error(payload?.error || "Caricamento istituti non riuscito");
     }
 
     const aspsps = Array.isArray(payload.aspsps) ? payload.aspsps : [];
-    availableInstitutions = aspsps;
-    if (!aspsps.length) {
+    const filteredInstitutions = searchTerm
+      ? aspsps.filter((institution) => String(institution.name || "").toLowerCase().includes(searchTerm))
+      : aspsps;
+
+    availableInstitutions = filteredInstitutions;
+    if (!filteredInstitutions.length) {
       renderInstitutionMessage("Nessun istituto trovato per il filtro corrente.");
       return;
     }
 
-    const topInstitutions = aspsps
+    const topInstitutions = filteredInstitutions
       .slice()
       .sort((left, right) => {
-        const leftScore = /revolut/i.test(left.name || "") ? -1 : 0;
-        const rightScore = /revolut/i.test(right.name || "") ? -1 : 0;
+        const leftScore = /(revolut|n26)/i.test(left.name || "") ? -1 : 0;
+        const rightScore = /(revolut|n26)/i.test(right.name || "") ? -1 : 0;
         if (leftScore !== rightScore) {
           return leftScore - rightScore;
         }
         return String(left.name || "").localeCompare(String(right.name || ""), "it");
       })
-      .slice(0, 12);
+      .slice(0, 50);
 
     els.bankInstitutionsList.innerHTML = topInstitutions
       .map((institution) => {

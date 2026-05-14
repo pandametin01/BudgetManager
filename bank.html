@@ -171,7 +171,17 @@
             <p class="eyebrow">Istituti</p>
             <h3>Banche disponibili per il consenso</h3>
           </div>
-          <button id="loadBankInstitutions" class="secondary" type="button">Carica istituti</button>
+          <div class="inline-actions">
+            <label>
+              Paese
+              <input id="bankInstitutionCountry" type="text" value="IT" maxlength="2" placeholder="IT" />
+            </label>
+            <label>
+              Cerca banca
+              <input id="bankInstitutionSearch" type="text" placeholder="Revolut, N26..." />
+            </label>
+            <button id="loadBankInstitutions" class="secondary" type="button">Carica istituti</button>
+          </div>
         </div>
 
         <div class="list-stack compact-stack" id="bankInstitutionsList">
