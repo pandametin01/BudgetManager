@@ -175,6 +175,14 @@ function setCurrentUsername(username) {
   sessionStorage.setItem(LOGIN_SESSION_KEY, normalizeUsername(username));
 }
 
+function getBankAuthStateStorageKey(username = getCurrentUsername()) {
+  return `budget-bank-auth-state:${normalizeUsername(username) || "guest"}`;
+}
+
+function getBankSessionStorageKey(username = getCurrentUsername()) {
+  return `budget-bank-session:${normalizeUsername(username) || "guest"}`;
+}
+
 function loadLegacyState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -393,6 +401,69 @@ async function pushCurrentStateToSupabase() {
   setBackupStatus("Stato attuale caricato su Supabase.", "positive");
 }
 
+async function resetAllUserData() {
+  const username = getCurrentUsername();
+  if (!username) {
+    setBackupStatus("Nessun utente attivo da resettare.", "negative");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Confermi la cancellazione di movimenti e risparmi per questo utente? Le banche collegate resteranno salvate. Questa azione non si puo annullare.",
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  setBackupStatus("Sto cancellando movimenti e risparmi dell'utente corrente...");
+
+  try {
+    if (isSupabaseEnabled() && supabaseSession?.user?.id) {
+      const userId = supabaseSession.user.id;
+
+      const deleteBankTransactions = await supabaseClient
+        .from("bank_transactions")
+        .delete()
+        .eq("user_id", userId);
+      if (deleteBankTransactions.error) {
+        throw new Error(deleteBankTransactions.error.message || "Errore pulizia bank_transactions.");
+      }
+
+      // Keep linked banks intact: only clear imported transaction memory.
+    }
+
+    const nextState = buildAccountState(state, username);
+    nextState.months = (nextState.months || []).map((month, index) => ({
+      ...month,
+      id: index,
+      transactions: [],
+    }));
+    nextState.savingsGoals = [];
+    state = nextState;
+
+    const accounts = getAccounts();
+    if (accounts[username]) {
+      accounts[username].state = cloneData(nextState);
+      saveAccounts(accounts);
+    }
+
+    if (username === DEFAULT_ACCOUNT_USERNAME) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloneData(nextState)));
+    }
+
+    saveLocalShadowState(username, nextState);
+    if (isSupabaseEnabled() && supabaseSession?.user) {
+      await upsertRemotePlannerState(username, nextState);
+    }
+    populateForms();
+    els.passwordForm.reset();
+    setBackupStatus("Movimenti e risparmi cancellati. Le banche collegate sono rimaste intatte.", "positive");
+  } catch (error) {
+    console.error("Errore reset totale dati", error);
+    setBackupStatus(error.message || "Non riesco a cancellare movimenti e risparmi.", "negative");
+  }
+}
+
 function populateForms() {
   els.profileForm.elements.namedItem("name").value = state.profile.name;
   els.profileForm.elements.namedItem("currency").value = state.profile.currency;
@@ -479,6 +550,11 @@ function bindEvents() {
 
     if (action === "push-supabase") {
       await pushCurrentStateToSupabase();
+      return;
+    }
+
+    if (action === "reset-all-data") {
+      await resetAllUserData();
     }
   });
 
