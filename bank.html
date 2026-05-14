@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collega banca · Budget Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="content profile-content">
+      <div class="content-topbar">
+        <a class="secondary" href="./index.html">Torna al planner</a>
+        <a class="secondary" href="./profile.html">Profilo</a>
+        <a class="session-pill session-link" href="./profile.html">Utente: <strong id="currentUsername">utente</strong></a>
+        <button id="logoutButton" class="secondary" type="button">Esci</button>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Open banking</p>
+            <h3>Collega Revolut tramite aggregatore</h3>
+          </div>
+          <button id="refreshBankStatus" class="secondary" type="button">Controlla configurazione</button>
+        </div>
+
+        <div class="dual-columns">
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Provider scelto</h4>
+              <span id="bankProviderTag" class="tag">GoCardless</span>
+            </div>
+            <p class="list-meta">Per Revolut personale la strada più concreta è passare da un aggregatore open banking già autorizzato come AISP.</p>
+            <div class="list-stack compact-stack">
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Aggregatore</h5>
+                  <strong id="bankProviderLabel">GoCardless Bank Account Data</strong>
+                </div>
+                <p class="list-meta">Copre PSD2 in Europa e ci evita l’accesso diretto alle API Revolut come TPP regolamentato.</p>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Paese base</h5>
+                  <strong id="bankCountry">IT</strong>
+                </div>
+                <p class="list-meta">Lo user flow iniziale sarà pensato per banche italiane e conto Revolut collegato dall’utente.</p>
+              </article>
+            </div>
+          </article>
+
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Stato integrazione</h4>
+              <span id="bankReadyTag" class="tag">Da configurare</span>
+            </div>
+            <div class="list-stack compact-stack">
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Secret ID</h5>
+                  <strong id="bankCheckSecretId" class="negative">Manca</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Secret Key</h5>
+                  <strong id="bankCheckSecretKey" class="negative">Manca</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Redirect URI</h5>
+                  <strong id="bankCheckRedirect" class="negative">Manca</strong>
+                </div>
+                <p id="bankRedirectValue" class="list-meta">Non impostata</p>
+              </article>
+            </div>
+            <p id="bankStatusMessage" class="list-meta">Quando questa sezione è tutta verde possiamo passare al collegamento vero del conto.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Flusso previsto</p>
+            <h3>Come funzionerà la sync</h3>
+          </div>
+        </div>
+
+        <div class="form-grid settings-grid">
+          <article class="card-form">
+            <h4>1. Consenso utente</h4>
+            <p class="form-helper">Il sito ti porta su una schermata GoCardless, poi scegli Revolut e autorizzi l’accesso alle transazioni.</p>
+          </article>
+
+          <article class="card-form">
+            <h4>2. Salvataggio connessione</h4>
+            <p class="form-helper">Salveremo in Supabase la connessione, l’istituto selezionato, gli account collegati e lo stato del consenso.</p>
+          </article>
+
+          <article class="card-form">
+            <h4>3. Sync movimenti</h4>
+            <p class="form-helper">Il Worker leggerà movimenti e saldo, poi li importerà nel planner come transazioni bancarie da categorizzare.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Supabase</p>
+            <h3>Dati che salveremo</h3>
+          </div>
+        </div>
+
+        <div class="form-grid settings-grid">
+          <article class="card-form">
+            <h4>Connessioni banca</h4>
+            <p class="form-helper">Provider, istituto scelto, stato del consenso, account collegati, ultima sync riuscita.</p>
+          </article>
+
+          <article class="card-form">
+            <h4>Sync eseguite</h4>
+            <p class="form-helper">Storico dei tentativi di sincronizzazione con esito, numero movimenti importati ed eventuali errori.</p>
+          </article>
+
+          <article class="card-form">
+            <h4>Movimenti bancari importati</h4>
+            <p class="form-helper">ID esterno banca, data, descrizione, importo, saldo dopo movimento, categoria assegnata e collegamento al planner.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./bank.js"></script>
+  </body>
+</html>
