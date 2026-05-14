@@ -925,10 +925,12 @@ function renderMonthOptions() {
 }
 
 function populateForms() {
-  els.profileForm.elements.namedItem("name").value = state.profile.name;
-  els.profileForm.elements.namedItem("currency").value = state.profile.currency;
-  els.profileForm.elements.namedItem("year").value = state.profile.year;
-  els.profileForm.elements.namedItem("startBalance").value = state.profile.startBalance;
+  if (els.profileForm) {
+    els.profileForm.elements.namedItem("name").value = state.profile.name;
+    els.profileForm.elements.namedItem("currency").value = state.profile.currency;
+    els.profileForm.elements.namedItem("year").value = state.profile.year;
+    els.profileForm.elements.namedItem("startBalance").value = state.profile.startBalance;
+  }
   els.incomeForm.elements.namedItem("date").value = getDefaultEntryDate(getSelectedMonth());
   els.incomeForm.elements.namedItem("time").value = "";
   els.transactionForm.elements.namedItem("date").value = new Date().toISOString().slice(0, 10);
@@ -1383,7 +1385,7 @@ function bindForms() {
     render();
   });
 
-  els.profileForm.addEventListener("submit", (event) => {
+  els.profileForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const year = Number(data.get("year")) || state.profile.year;

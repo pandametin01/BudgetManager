@@ -103,6 +103,13 @@ body.auth-screen .login-screen {
   color: var(--ink);
 }
 
+.session-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .hidden-shell {
   display: none;
 }
@@ -241,6 +248,11 @@ select {
 
 .content {
   padding: 30px;
+}
+
+.profile-content {
+  width: min(1100px, 100%);
+  margin: 0 auto;
 }
 
 .content-topbar {
