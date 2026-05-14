@@ -1171,6 +1171,22 @@ input {
   padding: 10px 12px;
 }
 
+.bank-debug-box {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(29, 44, 40, 0.04);
+  border: 1px dashed rgba(29, 44, 40, 0.16);
+  overflow: auto;
+}
+
+.bank-debug-box pre {
+  margin: 0;
+  font: 0.78rem/1.45 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .category-accordion {
   padding: 0;
   overflow: hidden;

@@ -53,6 +53,7 @@ const els = {
   insertMissingBankTransactions: document.getElementById("insertMissingBankTransactions"),
   bankMissingTransactionsMessage: document.getElementById("bankMissingTransactionsMessage"),
   bankMissingTransactionsList: document.getElementById("bankMissingTransactionsList"),
+  toggleBankDebug: document.getElementById("toggleBankDebug"),
 };
 
 let supabaseClient = null;
@@ -60,6 +61,7 @@ let supabaseSession = null;
 let availableInstitutions = [];
 let linkedBankSession = null;
 let pendingBankImports = [];
+let showBankDebug = false;
 
 bootstrap();
 
@@ -438,6 +440,7 @@ function renderMissingTransactionsPreview() {
             </label>
           </div>
           <p class="list-meta">ID banca: ${escapeHtml(item.externalTransactionId)}</p>
+          ${showBankDebug ? renderBankDebugBox(item) : ""}
         </article>
       `;
     })
@@ -448,6 +451,48 @@ function renderMissingTransactionsPreview() {
     dataList.id = "bank-preview-categories";
     document.body.appendChild(dataList);
   }
+}
+
+function renderBankDebugBox(item) {
+  const debugPayload = {
+    parsed: {
+      bankLabel: item.bankLabel,
+      date: item.date,
+      time: item.time,
+      type: item.type,
+      category: item.category,
+      amount: item.amount,
+      note: item.note,
+      externalTransactionId: item.externalTransactionId,
+    },
+    rawHighlights: {
+      merchant_name: item.rawPayload?.merchant_name,
+      creditor_name: item.rawPayload?.creditor_name,
+      debtor_name: item.rawPayload?.debtor_name,
+      counterparty_name: item.rawPayload?.counterparty_name,
+      ultimate_creditor: item.rawPayload?.ultimate_creditor,
+      ultimate_debtor: item.rawPayload?.ultimate_debtor,
+      transaction_information: item.rawPayload?.transaction_information,
+      additional_information: item.rawPayload?.additional_information,
+      remittance_information: item.rawPayload?.remittance_information,
+      booking_date_time: item.rawPayload?.booking_date_time,
+      value_date_time: item.rawPayload?.value_date_time,
+      status_update_date_time: item.rawPayload?.status_update_date_time,
+      transaction_date_time: item.rawPayload?.transaction_date_time,
+      booking_time: item.rawPayload?.booking_time,
+      value_time: item.rawPayload?.value_time,
+      transaction_time: item.rawPayload?.transaction_time,
+      entry_reference: item.rawPayload?.entry_reference,
+      transaction_id: item.rawPayload?.transaction_id,
+    },
+    rawPayload: item.rawPayload,
+  };
+
+  return `
+    <div class="bank-debug-box">
+      <pre>${escapeHtml(JSON.stringify(debugPayload, null, 2))}</pre>
+    </div>
+  `;
 }
 
 function renderPreviewTypeOptions(selectedType) {
@@ -1248,6 +1293,12 @@ function bindEvents() {
 
   els.insertMissingBankTransactions?.addEventListener("click", () => {
     insertMissingBankTransactions();
+  });
+
+  els.toggleBankDebug?.addEventListener("click", () => {
+    showBankDebug = !showBankDebug;
+    els.toggleBankDebug.textContent = showBankDebug ? "Nascondi debug banca" : "Mostra debug banca";
+    renderMissingTransactionsPreview();
   });
 
   els.bankInstitutionsList?.addEventListener("click", (event) => {
