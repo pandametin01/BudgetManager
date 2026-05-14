@@ -50,6 +50,7 @@ const els = {
   bankTransactionsMessage: document.getElementById("bankTransactionsMessage"),
   bankTransactionsList: document.getElementById("bankTransactionsList"),
   loadMissingBankTransactions: document.getElementById("loadMissingBankTransactions"),
+  excludeAllBankTransactions: document.getElementById("excludeAllBankTransactions"),
   insertMissingBankTransactions: document.getElementById("insertMissingBankTransactions"),
   bankMissingTransactionsMessage: document.getElementById("bankMissingTransactionsMessage"),
   bankMissingTransactionsList: document.getElementById("bankMissingTransactionsList"),
@@ -1385,6 +1386,17 @@ function bindEvents() {
 
   els.loadMissingBankTransactions?.addEventListener("click", () => {
     loadMissingBankTransactionsPreview();
+  });
+
+  els.excludeAllBankTransactions?.addEventListener("click", () => {
+    pendingBankImports = pendingBankImports.map((item) => ({ ...item, include: false }));
+    renderMissingTransactionsPreview();
+    renderMissingTransactionsMessage(
+      pendingBankImports.length
+        ? `Ho escluso ${pendingBankImports.length} transazioni dalla preview. Puoi riattivare solo quelle che vuoi importare.`
+        : "Non ci sono transazioni in anteprima da escludere.",
+      pendingBankImports.length ? "positive" : "",
+    );
   });
 
   els.insertMissingBankTransactions?.addEventListener("click", () => {
