@@ -524,6 +524,15 @@ async function initializeSupabase() {
     supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
     const sessionResult = await supabaseClient.auth.getSession();
     supabaseSession = sessionResult.data.session || null;
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      const previousUserId = supabaseSession?.user?.id || "";
+      const nextUserId = session?.user?.id || "";
+      supabaseSession = session || null;
+
+      if (previousUserId !== nextUserId || document.body.classList.contains("auth-screen")) {
+        await applyAuthState();
+      }
+    });
   } catch (error) {
     console.warn("Supabase non configurato o non raggiungibile, uso fallback locale.", error);
   }
@@ -1120,6 +1129,7 @@ function bindForms() {
         }
 
         supabaseSession = result.data.session;
+        setCurrentUsername(username);
         els.loginError.textContent = "";
         els.registerError.textContent = "";
         els.registerSuccess.textContent = "";
@@ -1204,6 +1214,7 @@ function bindForms() {
           supabaseSession = result.data.session;
         }
 
+        setCurrentUsername(username);
         const freshState = buildAccountState(createDefaultState(), username);
         freshState.profile.name = username.charAt(0).toUpperCase() + username.slice(1);
         saveLocalShadowState(username, freshState);
