@@ -7,10 +7,11 @@ const els = {
   refreshBankStatus: document.getElementById("refreshBankStatus"),
   bankProviderTag: document.getElementById("bankProviderTag"),
   bankProviderLabel: document.getElementById("bankProviderLabel"),
+  bankEnvironment: document.getElementById("bankEnvironment"),
   bankCountry: document.getElementById("bankCountry"),
   bankReadyTag: document.getElementById("bankReadyTag"),
-  bankCheckSecretId: document.getElementById("bankCheckSecretId"),
-  bankCheckSecretKey: document.getElementById("bankCheckSecretKey"),
+  bankCheckAppId: document.getElementById("bankCheckAppId"),
+  bankCheckPrivateKey: document.getElementById("bankCheckPrivateKey"),
   bankCheckRedirect: document.getElementById("bankCheckRedirect"),
   bankRedirectValue: document.getElementById("bankRedirectValue"),
   bankStatusMessage: document.getElementById("bankStatusMessage"),
@@ -85,23 +86,26 @@ async function refreshBankConfig() {
     }
 
     const config = await response.json();
-    els.bankProviderTag.textContent = "GoCardless";
-    els.bankProviderLabel.textContent = config.providerLabel || "GoCardless Bank Account Data";
+    els.bankProviderTag.textContent = config.providerTag || "Enable Banking";
+    els.bankProviderLabel.textContent = config.providerLabel || "Enable Banking";
+    els.bankEnvironment.textContent = config.environment || "Sandbox";
     els.bankCountry.textContent = config.country || "IT";
-    setCheck(els.bankCheckSecretId, Boolean(config.checks?.secretId));
-    setCheck(els.bankCheckSecretKey, Boolean(config.checks?.secretKey));
+    setCheck(els.bankCheckAppId, Boolean(config.checks?.appId));
+    setCheck(els.bankCheckPrivateKey, Boolean(config.checks?.privateKey));
     setCheck(els.bankCheckRedirect, Boolean(config.checks?.redirectUri));
     els.bankRedirectValue.textContent = config.redirectUri || "Non impostata";
 
     if (config.ready) {
       els.bankReadyTag.textContent = "Pronta";
-      els.bankStatusMessage.textContent = "Configurazione base pronta. Il prossimo step sarà creare il flusso di consenso e la sync automatica.";
       els.bankReadyTag.className = "tag positive";
-    } else {
-      els.bankReadyTag.textContent = "Da configurare";
-      els.bankStatusMessage.textContent = "Mancano ancora una o più variabili Cloudflare del provider open banking.";
-      els.bankReadyTag.className = "tag negative";
+      els.bankStatusMessage.textContent =
+        "Configurazione base pronta. Il prossimo step e costruire l'endpoint che firma il JWT e apre il consenso verso la banca.";
+      return;
     }
+
+    els.bankReadyTag.textContent = "Da configurare";
+    els.bankReadyTag.className = "tag negative";
+    els.bankStatusMessage.textContent = "Mancano ancora una o piu variabili Cloudflare del provider open banking.";
   } catch (error) {
     els.bankReadyTag.textContent = "Errore";
     els.bankReadyTag.className = "tag negative";

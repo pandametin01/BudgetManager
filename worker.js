@@ -19,15 +19,18 @@ export default {
     if (url.pathname === "/api/bank/config") {
       return Response.json(
         {
-          provider: "gocardless-bank-account-data",
-          providerLabel: "GoCardless Bank Account Data",
+          provider: "enable-banking",
+          providerTag: "Enable Banking",
+          providerLabel: "Enable Banking",
+          environment: "Sandbox",
           country: "IT",
-          redirectUri: env.GC_BA_REDIRECT_URI || "",
-          ready: Boolean(env.GC_BA_SECRET_ID && env.GC_BA_SECRET_KEY && env.GC_BA_REDIRECT_URI),
+          appId: env.ENABLE_BANKING_APP_ID || "",
+          redirectUri: env.ENABLE_BANKING_REDIRECT_URI || "",
+          ready: Boolean(env.ENABLE_BANKING_APP_ID && env.ENABLE_BANKING_PRIVATE_KEY && env.ENABLE_BANKING_REDIRECT_URI),
           checks: {
-            secretId: Boolean(env.GC_BA_SECRET_ID),
-            secretKey: Boolean(env.GC_BA_SECRET_KEY),
-            redirectUri: Boolean(env.GC_BA_REDIRECT_URI),
+            appId: Boolean(env.ENABLE_BANKING_APP_ID),
+            privateKey: Boolean(env.ENABLE_BANKING_PRIVATE_KEY),
+            redirectUri: Boolean(env.ENABLE_BANKING_REDIRECT_URI),
           },
         },
         {

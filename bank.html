@@ -25,7 +25,7 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Open banking</p>
-            <h3>Collega Revolut tramite aggregatore</h3>
+            <h3>Collega Revolut tramite Enable Banking</h3>
           </div>
           <button id="refreshBankStatus" class="secondary" type="button">Controlla configurazione</button>
         </div>
@@ -34,23 +34,34 @@
           <article class="data-card">
             <div class="card-title-row">
               <h4>Provider scelto</h4>
-              <span id="bankProviderTag" class="tag">GoCardless</span>
+              <span id="bankProviderTag" class="tag">Enable Banking</span>
             </div>
-            <p class="list-meta">Per Revolut personale la strada più concreta è passare da un aggregatore open banking già autorizzato come AISP.</p>
+            <p class="list-meta">
+              Per Revolut personale stiamo usando un aggregatore open banking PSD2 con sandbox dedicata, cosi il consenso utente passa da un flusso bancario vero senza esporti direttamente le credenziali.
+            </p>
             <div class="list-stack compact-stack">
               <article class="list-item">
                 <div class="list-item-top">
                   <h5>Aggregatore</h5>
-                  <strong id="bankProviderLabel">GoCardless Bank Account Data</strong>
+                  <strong id="bankProviderLabel">Enable Banking</strong>
                 </div>
-                <p class="list-meta">Copre PSD2 in Europa e ci evita l’accesso diretto alle API Revolut come TPP regolamentato.</p>
+                <p class="list-meta">
+                  L'app sandbox e gia registrata. Ora il Worker deve leggere le chiavi corrette e poi potremo costruire il consenso verso Revolut.
+                </p>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Ambiente</h5>
+                  <strong id="bankEnvironment">Sandbox</strong>
+                </div>
+                <p class="list-meta">Partiamo in sandbox per validare il flusso di collegamento, poi potremo valutare la strada produzione.</p>
               </article>
               <article class="list-item">
                 <div class="list-item-top">
                   <h5>Paese base</h5>
                   <strong id="bankCountry">IT</strong>
                 </div>
-                <p class="list-meta">Lo user flow iniziale sarà pensato per banche italiane e conto Revolut collegato dall’utente.</p>
+                <p class="list-meta">Il flusso iniziale resta pensato per l'uso personale in Italia e per il collegamento del conto Revolut dell'utente.</p>
               </article>
             </div>
           </article>
@@ -63,14 +74,14 @@
             <div class="list-stack compact-stack">
               <article class="list-item">
                 <div class="list-item-top">
-                  <h5>Secret ID</h5>
-                  <strong id="bankCheckSecretId" class="negative">Manca</strong>
+                  <h5>Application ID</h5>
+                  <strong id="bankCheckAppId" class="negative">Manca</strong>
                 </div>
               </article>
               <article class="list-item">
                 <div class="list-item-top">
-                  <h5>Secret Key</h5>
-                  <strong id="bankCheckSecretKey" class="negative">Manca</strong>
+                  <h5>Private key</h5>
+                  <strong id="bankCheckPrivateKey" class="negative">Manca</strong>
                 </div>
               </article>
               <article class="list-item">
@@ -81,7 +92,9 @@
                 <p id="bankRedirectValue" class="list-meta">Non impostata</p>
               </article>
             </div>
-            <p id="bankStatusMessage" class="list-meta">Quando questa sezione è tutta verde possiamo passare al collegamento vero del conto.</p>
+            <p id="bankStatusMessage" class="list-meta">
+              Quando questa sezione e tutta verde possiamo passare al primo endpoint di autorizzazione verso Enable Banking.
+            </p>
           </article>
         </div>
       </section>
@@ -90,24 +103,24 @@
         <div class="panel-header">
           <div>
             <p class="eyebrow">Flusso previsto</p>
-            <h3>Come funzionerà la sync</h3>
+            <h3>Come funzionera la sync</h3>
           </div>
         </div>
 
         <div class="form-grid settings-grid">
           <article class="card-form">
             <h4>1. Consenso utente</h4>
-            <p class="form-helper">Il sito ti porta su una schermata GoCardless, poi scegli Revolut e autorizzi l’accesso alle transazioni.</p>
+            <p class="form-helper">Il sito ti porta sul flusso di consenso di Enable Banking, poi scegli l'istituto e autorizzi l'accesso alle transazioni del conto.</p>
           </article>
 
           <article class="card-form">
             <h4>2. Salvataggio connessione</h4>
-            <p class="form-helper">Salveremo in Supabase la connessione, l’istituto selezionato, gli account collegati e lo stato del consenso.</p>
+            <p class="form-helper">Salveremo in Supabase l'istituto selezionato, gli account collegati, lo stato del consenso e gli identificativi della sessione bancaria.</p>
           </article>
 
           <article class="card-form">
             <h4>3. Sync movimenti</h4>
-            <p class="form-helper">Il Worker leggerà movimenti e saldo, poi li importerà nel planner come transazioni bancarie da categorizzare.</p>
+            <p class="form-helper">Il Worker leggera movimenti e saldo, poi li importera nel planner come transazioni bancarie da categorizzare.</p>
           </article>
         </div>
       </section>
