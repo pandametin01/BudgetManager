@@ -184,6 +184,61 @@
       <section class="panel">
         <div class="panel-header">
           <div>
+            <p class="eyebrow">Pagina di prova</p>
+            <h3>Transazioni ultimi 5 giorni</h3>
+          </div>
+          <button id="loadRecentTransactions" class="secondary" type="button">Carica ultimi 5 giorni</button>
+        </div>
+
+        <div class="dual-columns">
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Connessione attuale</h4>
+              <span id="bankConnectionTag" class="tag">Nessuna</span>
+            </div>
+            <div class="list-stack compact-stack">
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Banca collegata</h5>
+                  <strong id="bankConnectedInstitution">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <div class="list-item-top">
+                  <h5>Sessione</h5>
+                  <strong id="bankConnectedSession">-</strong>
+                </div>
+              </article>
+              <article class="list-item">
+                <label>
+                  Conto da testare
+                  <select id="bankAccountSelect">
+                    <option value="">Nessun account disponibile</option>
+                  </select>
+                </label>
+              </article>
+            </div>
+            <p id="bankConnectionMessage" class="list-meta">Dopo il consenso salvero qui la sessione collegata e potrai usare questo blocco per testare le transazioni reali.</p>
+          </article>
+
+          <article class="data-card">
+            <div class="card-title-row">
+              <h4>Esito prova</h4>
+              <span id="bankTransactionsTag" class="tag">In attesa</span>
+            </div>
+            <p id="bankTransactionsMessage" class="list-meta">Quando lanci il test, qui vedrai se il Worker riesce a recuperare i movimenti reali del conto selezionato.</p>
+            <div class="list-stack compact-stack" id="bankTransactionsList">
+              <article class="list-item">
+                <p class="list-meta">Nessuna transazione caricata per ora.</p>
+              </article>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
             <p class="eyebrow">Flusso previsto</p>
             <h3>Come funzionera la sync</h3>
           </div>
