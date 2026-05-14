@@ -3,6 +3,7 @@ const ACCOUNTS_KEY = "budget-planner-accounts-v1";
 const LOGIN_SESSION_KEY = "budget-planner-session-user";
 const SUPABASE_CONFIG_ENDPOINT = "/api/config";
 const SUPABASE_EMAIL_DOMAIN = "budgetplanner.app";
+const DEFAULT_ACCOUNT_USERNAME = "mattia";
 const MONTHS = [
   "Gennaio",
   "Febbraio",
@@ -189,11 +190,35 @@ function loadLegacyState() {
 }
 
 function buildAccountState(sourceState, fallbackName = "") {
-  const normalized = normalizePlannerState(sourceState || createDefaultState());
+  const normalized = migrateState(
+    normalizePlannerState(sourceState || createDefaultState()),
+    normalizeUsername(fallbackName),
+  );
   if (!normalized.profile.name && fallbackName) {
     normalized.profile.name = fallbackName;
   }
   return cloneData(normalized);
+}
+
+function hasDefaultXrpPortfolio(investments) {
+  return Array.isArray(investments)
+    && investments.length === 1
+    && String(investments[0]?.coinId || "").toLowerCase() === "ripple"
+    && Number(investments[0]?.quantity || 0) === 710
+    && Number(investments[0]?.invested || 0) === 2000;
+}
+
+function migrateState(currentState, username = "") {
+  currentState.appliedMigrations = currentState.appliedMigrations || {};
+
+  if (!currentState.appliedMigrations.investmentsScopedByUserMay2026) {
+    if (normalizeUsername(username) !== DEFAULT_ACCOUNT_USERNAME && hasDefaultXrpPortfolio(currentState.investments)) {
+      currentState.investments = [];
+    }
+    currentState.appliedMigrations.investmentsScopedByUserMay2026 = true;
+  }
+
+  return currentState;
 }
 
 function getLocalAccountStateByUsername(username) {

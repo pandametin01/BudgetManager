@@ -586,7 +586,10 @@ function loadLegacyState() {
 }
 
 function buildAccountState(sourceState, fallbackName = "") {
-  const normalized = migrateState(normalizePlannerState(sourceState || createDefaultState()));
+  const normalized = migrateState(
+    normalizePlannerState(sourceState || createDefaultState()),
+    normalizeUsername(fallbackName),
+  );
   if (!normalized.profile.name && fallbackName) {
     normalized.profile.name = fallbackName;
   }
@@ -805,7 +808,15 @@ async function loadState(username = getCurrentUsername()) {
   }
 }
 
-function migrateState(currentState) {
+function hasDefaultXrpPortfolio(investments) {
+  return Array.isArray(investments)
+    && investments.length === 1
+    && String(investments[0]?.coinId || "").toLowerCase() === "ripple"
+    && Number(investments[0]?.quantity || 0) === 710
+    && Number(investments[0]?.invested || 0) === 2000;
+}
+
+function migrateState(currentState, username = "") {
   currentState.appliedMigrations = currentState.appliedMigrations || {};
 
   if (!currentState.appliedMigrations.debtStartAdjustmentsMay2026) {
@@ -824,8 +835,11 @@ function migrateState(currentState) {
     currentState.appliedMigrations.debtStartAdjustmentsMay2026 = true;
   }
 
-  if (!currentState.investments?.length) {
-    currentState.investments = defaultInvestments();
+  if (!currentState.appliedMigrations.investmentsScopedByUserMay2026) {
+    if (normalizeUsername(username) !== DEFAULT_ACCOUNT.username && hasDefaultXrpPortfolio(currentState.investments)) {
+      currentState.investments = [];
+    }
+    currentState.appliedMigrations.investmentsScopedByUserMay2026 = true;
   }
   return currentState;
 
