@@ -2398,6 +2398,7 @@ function renderRangeBudgetChart(context) {
     ${renderCategoryPieCard(context.categoryBreakdown, `Spese per categoria · ${context.title}`)}
   `;
 
+  bindChartHoverCard();
   bindPieInteractions();
 }
 
@@ -3116,6 +3117,8 @@ function bindChartInteractions(month) {
     return;
   }
 
+  bindChartHoverCard();
+
   const selection = svg.querySelector(".chart-selection");
   if (!selection) {
     return;
@@ -3198,6 +3201,91 @@ function bindChartInteractions(month) {
 
 function heightFromSvg(svg) {
   return Number(svg.dataset.height || 0);
+}
+
+function bindChartHoverCard() {
+  const card = els.budgetCharts.querySelector(".chart-card");
+  const svg = card?.querySelector(".chart-svg");
+  if (!card || !svg) {
+    return;
+  }
+
+  let tooltip = card.querySelector("[data-chart-hover-card]");
+  if (!tooltip) {
+    tooltip = document.createElement("div");
+    tooltip.className = "chart-hover-card";
+    tooltip.dataset.chartHoverCard = "true";
+    tooltip.hidden = true;
+    card.appendChild(tooltip);
+  }
+
+  svg.querySelectorAll("title").forEach((titleNode) => {
+    const parent = titleNode.parentElement;
+    if (!parent || parent.dataset.chartTooltipReady === "true") {
+      return;
+    }
+    parent.dataset.chartTooltipText = titleNode.textContent || "";
+    parent.dataset.chartTooltipReady = "true";
+    titleNode.remove();
+  });
+
+  const buildTooltipContent = (rawText) => {
+    const text = String(rawText || "").trim();
+    if (!text) {
+      return "";
+    }
+
+    const parts = text.split(" - ").map((item) => item.trim()).filter(Boolean);
+    const lastPart = parts[parts.length - 1] || "";
+    const looksLikeAmount = /€/.test(lastPart);
+    const eyebrow = parts.length > 1 ? parts[0] : "";
+    const title = parts.length > 1
+      ? parts.slice(1, looksLikeAmount ? -1 : undefined).join(" · ") || parts[0]
+      : text;
+    const value = looksLikeAmount ? lastPart : "";
+    const note = looksLikeAmount ? "" : parts.length > 1 ? parts.slice(1).join(" · ") : "";
+
+    return `
+      ${eyebrow ? `<p class="chart-hover-eyebrow">${escapeHtml(eyebrow)}</p>` : ""}
+      <h5>${escapeHtml(title)}</h5>
+      ${value ? `<strong class="chart-hover-value">${escapeHtml(value)}</strong>` : ""}
+      ${note ? `<p class="chart-hover-note">${escapeHtml(note)}</p>` : ""}
+    `;
+  };
+
+  const placeTooltip = (event) => {
+    const rect = card.getBoundingClientRect();
+    tooltip.hidden = false;
+    const tipRect = tooltip.getBoundingClientRect();
+    let left = event.clientX - rect.left + 18;
+    let top = event.clientY - rect.top + 18;
+
+    if (left + tipRect.width > rect.width - 12) {
+      left = event.clientX - rect.left - tipRect.width - 18;
+    }
+
+    if (top + tipRect.height > rect.height - 12) {
+      top = rect.height - tipRect.height - 12;
+    }
+
+    tooltip.style.left = `${Math.max(12, left)}px`;
+    tooltip.style.top = `${Math.max(12, top)}px`;
+  };
+
+  svg.onpointermove = (event) => {
+    const target = event.target.closest("[data-chart-tooltip-text]");
+    if (!target || !svg.contains(target)) {
+      tooltip.hidden = true;
+      return;
+    }
+
+    tooltip.innerHTML = buildTooltipContent(target.dataset.chartTooltipText || "");
+    placeTooltip(event);
+  };
+
+  svg.onpointerleave = () => {
+    tooltip.hidden = true;
+  };
 }
 
 function renderCategoryList(month) {

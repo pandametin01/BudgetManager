@@ -732,6 +732,7 @@ input {
 }
 
 .chart-card {
+  position: relative;
   padding: 18px;
   border-radius: 22px;
   background: white;
@@ -874,6 +875,52 @@ input {
   stroke: rgba(214, 107, 61, 0.58);
   stroke-width: 1.5;
   stroke-dasharray: 6 6;
+}
+
+.chart-hover-card {
+  position: absolute;
+  z-index: 5;
+  width: min(320px, calc(100% - 24px));
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 250, 243, 0.97);
+  border: 1px solid rgba(214, 107, 61, 0.22);
+  box-shadow: 0 18px 44px rgba(29, 44, 40, 0.16);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.chart-hover-card h5,
+.chart-hover-card p,
+.chart-hover-card strong {
+  margin: 0;
+}
+
+.chart-hover-eyebrow {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chart-hover-card h5 {
+  margin-top: 4px;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.chart-hover-value {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--accent-deep);
+  font-size: 1.12rem;
+}
+
+.chart-hover-note {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .chart-focus-note {
