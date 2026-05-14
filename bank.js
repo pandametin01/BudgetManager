@@ -411,6 +411,10 @@ function renderMissingTransactionsPreview() {
               Includi
             </label>
           </div>
+          <p class="list-meta">
+            Affidabilita match: <strong>${escapeHtml(item.matchReliabilityLabel || "Stimata")}</strong>
+            ${item.timeMissingFromBank ? " · Ora non disponibile dalla banca" : ""}
+          </p>
           <div class="bank-preview-grid">
             <label>
               Data
@@ -1062,6 +1066,8 @@ async function loadMissingBankTransactionsPreview() {
         const type = amountInfo.amount >= 0 ? "income" : "expense";
         const category = type === "income" ? "Entrate" : suggestCategoryFromTransaction(note, plannerCategories);
         const normalizedAmount = Number(Math.abs(amountInfo.amount).toFixed(2));
+        const hasEntryReference = Boolean(String(transaction?.entry_reference || "").trim());
+        const hasReadableLabel = note !== "Movimento bancario";
         const preview = {
           include: true,
           accountUid,
@@ -1079,6 +1085,9 @@ async function loadMissingBankTransactionsPreview() {
           note,
           currency: amountInfo.currency,
           rawPayload: transaction,
+          timeMissingFromBank: !timePart,
+          matchReliability: hasEntryReference ? "high" : hasReadableLabel ? "medium" : "low",
+          matchReliabilityLabel: hasEntryReference ? "Alta · ID banca presente" : hasReadableLabel ? "Media · Match stimato" : "Bassa · Dati minimi",
         };
         preview.duplicateSignature = createPlannerDuplicateSignature(preview);
         return preview;
