@@ -313,6 +313,7 @@ async function fetchAllRecentTransactions(env, accountUid, dateFrom, dateTo) {
       break;
     }
 
+    await delay(250);
     remainingPages -= 1;
   }
 
@@ -351,6 +352,14 @@ async function callEnableBankingApi(env, path, init = {}) {
   }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      const retryAfter = Number.parseInt(response.headers.get("Retry-After") || "", 10);
+      const retryHint = Number.isFinite(retryAfter) && retryAfter > 0
+        ? ` Riprova tra circa ${retryAfter} secondi.`
+        : "";
+      throw new Error(`Enable Banking sta limitando temporaneamente le richieste.${retryHint} Se serve, riduci il periodo e riprova.`);
+    }
+
     const message =
       body?.message ||
       body?.error_description ||
@@ -438,4 +447,8 @@ function formatIsoDate(value) {
   const month = String(value.getUTCMonth() + 1).padStart(2, "0");
   const day = String(value.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
