@@ -1891,19 +1891,44 @@ function render() {
     stats: statsMap.get(monthKey(month)),
   }));
 
-  renderKpis(stats);
-  renderRunwayStats(stats);
-  renderSidebar(annualStats);
-  renderAnnualCards(annualStats);
-  renderBudgetCharts(selectedMonth, stats);
-  renderIncomeList(selectedMonth, stats);
-  renderBillList(selectedMonth);
-  renderCategoryList(selectedMonth, stats);
-  renderTransactions(selectedMonth);
-  renderAllMovements();
-  renderInvestments();
-  renderGoals();
+  renderSectionSafely("indicatori principali", els.kpiGrid, () => renderKpis(stats));
+  renderSectionSafely("statistiche utili", els.runwayStats, () => renderRunwayStats(stats));
+  renderSectionSafely("snapshot laterale", els.sidebarSnapshot, () => renderSidebar(annualStats));
+  renderSectionSafely("panoramica annuale", els.annualCards, () => renderAnnualCards(annualStats));
+  renderSectionSafely("grafici", els.budgetCharts, () => renderBudgetCharts(selectedMonth, stats));
+  renderSectionSafely("entrate del mese", els.incomeList, () => renderIncomeList(selectedMonth, stats));
+  renderSectionSafely("bills del mese", els.billList, () => renderBillList(selectedMonth));
+  renderSectionSafely("categorie del mese", els.categoryList, () => renderCategoryList(selectedMonth, stats));
+  renderSectionSafely("movimenti recenti", els.transactionList, () => renderTransactions(selectedMonth));
+  renderSectionSafely("archivio movimenti", els.allMovementsList, () => renderAllMovements());
+  renderSectionSafely("investimenti", els.investmentCards, () => renderInvestments());
+  renderSectionSafely("obiettivi", null, () => renderGoals(), [els.savingGoalsList, els.debtGoalsList]);
   playDashboardSlotAnimation();
+}
+
+function renderSectionSafely(sectionName, target, renderFn, extraTargets = []) {
+  try {
+    renderFn();
+  } catch (error) {
+    console.error(`Errore render sezione: ${sectionName}`, error);
+    const message = `
+      <div class="empty-state">
+        <p class="eyebrow">Errore sezione</p>
+        <h4>${escapeHtml(sectionName)}</h4>
+        <p class="list-meta">${escapeHtml(error?.message || "Errore sconosciuto")}</p>
+      </div>
+    `;
+
+    if (target) {
+      target.innerHTML = message;
+    }
+
+    extraTargets.forEach((node) => {
+      if (node) {
+        node.innerHTML = message;
+      }
+    });
+  }
 }
 
 function playDashboardSlotAnimation() {
