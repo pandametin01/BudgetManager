@@ -790,6 +790,43 @@ async function upsertRemotePlannerState(username, plannerState) {
   }
 }
 
+async function deleteRemoteBankTransactionLink(transaction) {
+  if (!supabaseClient || !supabaseSession?.user?.id || !transaction) {
+    return;
+  }
+
+  const plannerTransactionId = String(transaction.id || "").trim();
+  const externalTransactionId = String(transaction.bankExternalId || "").trim();
+
+  try {
+    if (plannerTransactionId) {
+      const plannerDeleteResult = await supabaseClient
+        .from("bank_transactions")
+        .delete()
+        .eq("user_id", supabaseSession.user.id)
+        .eq("planner_transaction_id", plannerTransactionId);
+
+      if (plannerDeleteResult.error) {
+        console.error("Errore cancellazione link banca per planner_transaction_id", plannerDeleteResult.error);
+      }
+    }
+
+    if (externalTransactionId) {
+      const externalDeleteResult = await supabaseClient
+        .from("bank_transactions")
+        .delete()
+        .eq("user_id", supabaseSession.user.id)
+        .eq("external_transaction_id", externalTransactionId);
+
+      if (externalDeleteResult.error) {
+        console.error("Errore cancellazione link banca per external_transaction_id", externalDeleteResult.error);
+      }
+    }
+  } catch (error) {
+    console.error("Errore cancellazione collegamento transazione bancaria", error);
+  }
+}
+
 async function ensureRemotePlannerState(username) {
   if (!supabaseSession?.user) {
     return buildAccountState(createDefaultState(), username);
@@ -1604,22 +1641,24 @@ function bindActions() {
       return;
     }
 
-    if (action === "seed-sample") {
-      seedSampleData();
-      return;
-    }
+    const run = async () => {
 
-    if (action === "reset-storage") {
-      state = buildAccountState(createDefaultState(), getCurrentUsername());
-      activeCategoryFilter = "";
-      clearChartZoom();
-      movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", minAmount: "", maxAmount: "", sortBy: "date-desc" };
-      saveState();
-      renderMonthOptions();
-      populateForms();
-      render();
-      return;
-    }
+      if (action === "seed-sample") {
+        seedSampleData();
+        return;
+      }
+
+      if (action === "reset-storage") {
+        state = buildAccountState(createDefaultState(), getCurrentUsername());
+        activeCategoryFilter = "";
+        clearChartZoom();
+        movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+        saveState();
+        renderMonthOptions();
+        populateForms();
+        render();
+        return;
+      }
 
     if (action === "clear-category-filter") {
       activeCategoryFilter = "";
@@ -1678,11 +1717,14 @@ function bindActions() {
 
     if (action === "logout") {
       (async () => {
+        sessionStorage.removeItem(LOGIN_SESSION_KEY);
         if (isSupabaseEnabled()) {
-          await supabaseClient.auth.signOut();
+          try {
+            await supabaseClient.auth.signOut();
+          } catch (error) {
+            console.error("Errore logout Supabase", error);
+          }
           supabaseSession = null;
-        } else {
-          sessionStorage.removeItem(LOGIN_SESSION_KEY);
         }
         els.loginError.textContent = "";
         els.registerError.textContent = "";
@@ -1717,11 +1759,13 @@ function bindActions() {
       getSelectedMonth().categoryBudgets = getSelectedMonth().categoryBudgets.filter((item) => item.id !== id);
     }
 
-    if (action === "delete-transaction") {
-      state.months.forEach((month) => {
-        month.transactions = month.transactions.filter((item) => item.id !== id);
-      });
-    }
+      if (action === "delete-transaction") {
+        const transactionToDelete = findTransactionById(id);
+        await deleteRemoteBankTransactionLink(transactionToDelete);
+        state.months.forEach((month) => {
+          month.transactions = month.transactions.filter((item) => item.id !== id);
+        });
+      }
 
     if (action === "delete-saving-goal") {
       state.savingsGoals = state.savingsGoals.filter((item) => item.id !== id);
@@ -1731,8 +1775,13 @@ function bindActions() {
       state.debtGoals = state.debtGoals.filter((item) => item.id !== id);
     }
 
-    saveState();
-    render();
+      saveState();
+      render();
+    };
+
+    run().catch((error) => {
+      console.error("Errore gestione azione UI", error);
+    });
   });
 }
 
@@ -1750,6 +1799,8 @@ async function applyAuthState() {
   els.loginScreen.classList.toggle("hidden-login", authenticated);
   els.pageShell.hidden = !authenticated;
   els.loginScreen.hidden = authenticated;
+  els.pageShell.style.display = authenticated ? "grid" : "none";
+  els.loginScreen.style.display = authenticated ? "none" : "grid";
   document.body.classList.toggle("auth-screen", !authenticated);
 
   if (!authenticated) {
