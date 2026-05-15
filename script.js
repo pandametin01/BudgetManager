@@ -110,6 +110,7 @@ const els = {
   selectedMonth: document.getElementById("selectedMonth"),
   kpiGrid: document.getElementById("kpiGrid"),
   runwayEndDate: document.getElementById("runwayEndDate"),
+  runwayDailyBudget: document.getElementById("runwayDailyBudget"),
   runwayStats: document.getElementById("runwayStats"),
   annualCards: document.getElementById("annualCards"),
   annualYearFilter: document.getElementById("annualYearFilter"),
@@ -174,6 +175,7 @@ let chartDayValue = "";
 let chartPeriodStartValue = "";
 let chartPeriodEndValue = "";
 let runwayEndDateValue = "";
+let runwayDailyBudgetValue = "";
 let chartZoomRange = null;
 let investmentQuotes = {};
 let investmentRefreshHandle = null;
@@ -1627,6 +1629,7 @@ function populateForms() {
   els.chartPeriodStartPicker.disabled = !((isMonthScope && chartView === "period") || isCustomScope);
   els.chartPeriodEndPicker.disabled = !((isMonthScope && chartView === "period") || isCustomScope);
   els.runwayEndDate.value = getResolvedRunwayEndDate();
+  els.runwayDailyBudget.value = runwayDailyBudgetValue;
   els.movementFilterMode.value = movementFilter.mode;
   els.movementFilterStart.value = movementFilter.start;
   els.movementFilterEnd.value = movementFilter.end;
@@ -2004,6 +2007,11 @@ function bindForms() {
 
   els.runwayEndDate.addEventListener("change", (event) => {
     runwayEndDateValue = event.target.value || getDefaultRunwayEndDate();
+    render();
+  });
+
+  els.runwayDailyBudget.addEventListener("input", (event) => {
+    runwayDailyBudgetValue = event.target.value;
     render();
   });
 
@@ -2766,11 +2774,21 @@ function renderRunwayStats(stats) {
   const endDate = new Date(`${endDateValue}T23:59:59`);
   const today = new Date();
   const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayValue = toDateInputValue(startDate);
   const diffMs = endDate.getTime() - startDate.getTime();
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
   const weekendDays = countWeekendDays(startDate, endDate);
   const dailySpend = totalDays > 0 ? available / totalDays : 0;
   const weekendSpend = weekendDays > 0 ? available / weekendDays : 0;
+  const configuredDailyBudget = Number(runwayDailyBudgetValue);
+  const hasConfiguredDailyBudget = runwayDailyBudgetValue !== "" && !Number.isNaN(configuredDailyBudget) && configuredDailyBudget > 0;
+  const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
+  const todaySpent = allMovementEntries()
+    .filter((item) => item.type === "expense" && item.date === todayValue)
+    .reduce((total, item) => total + Number(item.amount || 0), 0);
+  const todayRemaining = Math.max(0, effectiveDailyBudget - todaySpent);
+  const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
+  const noSpendDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
 
   const items = [
     {
@@ -2782,6 +2800,25 @@ function renderRunwayStats(stats) {
       label: "Budget massimo al giorno",
       value: totalDays > 0 ? money(dailySpend) : "--",
       note: totalDays > 0 ? `${totalDays} giorni fino al termine` : "scegli una data finale valida",
+    },
+    {
+      label: "Limite giornaliero attivo",
+      value: totalDays > 0 ? money(effectiveDailyBudget) : "--",
+      note: hasConfiguredDailyBudget
+        ? `fissato ${money(configuredDailyBudget)} - sostenibile max ${money(dailySpend)}`
+        : "automatico dal disponibile libero",
+    },
+    {
+      label: "Puoi spendere oggi",
+      value: totalDays > 0 ? money(todayRemaining) : "--",
+      note: `spesi oggi ${money(todaySpent)} sul limite giornaliero`,
+    },
+    {
+      label: "Recupero sforamento",
+      value: noSpendDays > 0 ? `${noSpendDays} giorni` : "In linea",
+      note: noSpendDays > 0
+        ? `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
+        : "nessuno sforamento sul giorno corrente",
     },
     {
       label: "Budget solo venerdi-sabato-domenica",
