@@ -2790,6 +2790,12 @@ function renderRunwayStats(stats) {
   const todayRemaining = Math.max(0, effectiveDailyBudget - todaySpent);
   const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
   const noSpendDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
+  const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
+  const recoveryNote = noSpendDays > 0
+    ? todayOverspend < effectiveDailyBudget
+      ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
+      : `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
+    : "nessuno sforamento sul giorno corrente";
 
   const items = [
     {
@@ -2817,9 +2823,7 @@ function renderRunwayStats(stats) {
     {
       label: "Recupero sforamento",
       value: noSpendDays > 0 ? `${noSpendDays} giorni` : "In linea",
-      note: noSpendDays > 0
-        ? `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
-        : "nessuno sforamento sul giorno corrente",
+      note: recoveryNote,
     },
     {
       label: "Budget solo venerdi-sabato-domenica",
