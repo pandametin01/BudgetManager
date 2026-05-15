@@ -225,73 +225,43 @@
           </div>
         </section>
 
-        <section class="panel ledger-panel" id="transactions">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Movimenti reali</p>
-              <h3>Registro spese, entrate, risparmi e debiti</h3>
+        <section class="transaction-entry-section" id="transactions">
+          <form id="transactionForm" class="card-form wide-form">
+            <h4>Nuovo movimento</h4>
+            <label>
+              Data
+              <input name="date" type="date" required />
+            </label>
+            <label>
+              Ora
+              <input name="time" type="time" />
+            </label>
+            <label>
+              Tipo
+              <select name="type">
+                <option value="expense">Spesa</option>
+                <option value="income">Entrata extra</option>
+                <option value="saving">Versamento risparmio</option>
+                <option value="debt">Pagamento debito</option>
+              </select>
+            </label>
+            <label>
+              Categoria / goal
+              <select name="category" id="transactionCategorySelect" required></select>
+            </label>
+            <label>
+              Importo
+              <input name="amount" type="number" step="0.01" required />
+            </label>
+            <label class="wide">
+              Nota
+              <input name="note" type="text" placeholder="Dettaglio utile" />
+            </label>
+            <div class="wide inline-actions">
+              <button class="secondary" type="button" data-action="jump-category-form">Nuova categoria</button>
+              <button class="primary" type="submit">Registra movimento</button>
             </div>
-            <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="transactions" aria-expanded="true" aria-label="Apri o chiudi pannello movimenti">›</button>
-          </div>
-          <div class="panel-collapsible-content">
-          <div class="form-grid ledger-grid">
-            <form id="transactionForm" class="card-form wide-form">
-              <h4>Nuovo movimento</h4>
-              <label>
-                Data
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Ora
-                <input name="time" type="time" />
-              </label>
-              <label>
-                Tipo
-                <select name="type">
-                  <option value="expense">Spesa</option>
-                  <option value="income">Entrata extra</option>
-                  <option value="saving">Versamento risparmio</option>
-                  <option value="debt">Pagamento debito</option>
-                </select>
-              </label>
-              <label>
-                Categoria / goal
-                <select name="category" id="transactionCategorySelect" required></select>
-              </label>
-              <label>
-                Importo
-                <input name="amount" type="number" step="0.01" required />
-              </label>
-              <label class="wide">
-                Nota
-                <input name="note" type="text" placeholder="Dettaglio utile" />
-              </label>
-              <div class="wide inline-actions">
-                <button class="secondary" type="button" data-action="jump-category-form">Nuova categoria</button>
-                <button class="primary" type="submit">Registra movimento</button>
-              </div>
-            </form>
-          </div>
-          </div>
-        </section>
-
-        <section class="panel recent-transactions-panel" id="recent-transactions">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Movimenti reali</p>
-              <h3>Movimenti recenti</h3>
-            </div>
-            <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="recent-transactions" aria-expanded="true" aria-label="Apri o chiudi pannello movimenti recenti">›</button>
-          </div>
-          <div class="panel-collapsible-content">
-            <div class="data-card">
-              <div class="card-title-row">
-                <h4>Ultimi movimenti del mese</h4>
-                <span id="transactionCount" class="tag"></span>
-              </div>
-              <div id="transactionList" class="list-stack"></div>
-            </div>
-          </div>
+          </form>
         </section>
 
         <section class="panel movements-panel" id="movement-archive">

@@ -604,11 +604,6 @@ input {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.ledger-grid {
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
 .goals-grid {
   grid-template-columns: 1fr 1fr 0.9fr;
 }
@@ -617,20 +612,6 @@ input {
 .data-card {
   padding: 20px;
   border-radius: 24px;
-}
-
-.ledger-panel .data-card,
-.ledger-panel .card-form {
-  padding: 16px 18px;
-}
-
-.ledger-panel .list-stack {
-  margin-top: 12px;
-  gap: 10px;
-}
-
-.ledger-panel .card-title-row {
-  align-items: flex-start;
 }
 
 .card-form {
@@ -694,6 +675,10 @@ input {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.transaction-entry-section {
+  margin-bottom: 22px;
 }
 
 #transactionForm {
@@ -1610,7 +1595,6 @@ input {
 
   .annual-cards,
   .settings-grid,
-  .ledger-grid,
   .goals-grid,
   .dual-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1655,7 +1639,6 @@ input {
   .hero,
   .annual-cards,
   .settings-grid,
-  .ledger-grid,
   .goals-grid,
   .dual-columns,
   .archive-filters,

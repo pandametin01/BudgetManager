@@ -123,7 +123,6 @@ const els = {
   incomeList: document.getElementById("incomeList"),
   billList: document.getElementById("billList"),
   categoryList: document.getElementById("categoryList"),
-  transactionList: document.getElementById("transactionList"),
   allMovementsList: document.getElementById("allMovementsList"),
   investmentCards: document.getElementById("investmentCards"),
   investmentStatus: document.getElementById("investmentStatus"),
@@ -148,7 +147,6 @@ const els = {
   incomeCount: document.getElementById("incomeCount"),
   billCount: document.getElementById("billCount"),
   categoryCount: document.getElementById("categoryCount"),
-  transactionCount: document.getElementById("transactionCount"),
   savingCount: document.getElementById("savingCount"),
   debtCount: document.getElementById("debtCount"),
   transactionCategorySelect: document.getElementById("transactionCategorySelect"),
@@ -2629,7 +2627,6 @@ function render() {
   renderSectionSafely("panoramica annuale", els.annualCards, () => renderAnnualCards(annualStats));
   renderSectionSafely("grafici", els.budgetCharts, () => renderBudgetCharts(selectedMonth, stats));
   renderSectionSafely("categorie del mese", els.categoryList, () => renderCategoryList(selectedMonth, stats));
-  renderSectionSafely("movimenti recenti", els.transactionList, () => renderTransactions(selectedMonth));
   renderSectionSafely("archivio movimenti", els.allMovementsList, () => renderAllMovements());
   renderSectionSafely("investimenti", els.investmentCards, () => renderInvestments());
   renderSectionSafely("obiettivi", null, () => renderGoals(), [els.savingGoalsList, els.debtGoalsList]);
@@ -4310,37 +4307,6 @@ function renderBillList(month) {
           <p class="list-meta">Scadenza giorno ${item.dueDay} · Budget ${money(item.budget)}</p>
           <div class="hero-actions compact">
             <button class="secondary" data-action="delete-bill" data-id="${item.id}">Elimina</button>
-          </div>
-        </article>
-      `,
-    )
-    .join("");
-}
-
-function renderTransactions(month) {
-  const ordered = allMovementEntries()
-    .filter((item) => item.monthId === month.id && item.year === month.year)
-    .sort(compareMovements);
-  els.transactionCount.textContent = `${Math.min(ordered.length, 5)} recenti`;
-
-  if (!ordered.length) {
-    els.transactionList.innerHTML = emptyStateTemplate.innerHTML;
-    return;
-  }
-
-  els.transactionList.innerHTML = ordered
-    .slice(0, 5)
-    .map(
-      (item) => `
-        <article class="list-item">
-          <div class="list-item-top">
-            <button class="movement-category-link" data-category-filter="${escapeAttribute(item.category)}">${item.category}</button>
-            <strong class="${movementAmountClass(item.type)}">${money(item.amount)}</strong>
-          </div>
-          <p class="list-meta">${formatDateTime(item)} · ${typeLabel(item.type)}</p>
-          ${item.note ? `<p class="list-meta">${item.note}</p>` : ""}
-          <div class="hero-actions compact">
-            <button class="secondary" data-action="${item.sourceKind === "income" ? "delete-income" : "delete-transaction"}" data-id="${item.id}">Elimina</button>
           </div>
         </article>
       `,
