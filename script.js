@@ -295,6 +295,7 @@ function createDefaultState() {
       year,
       startBalance: 0,
       selectedMonth: new Date().getMonth(),
+      selectedMonthKey: `${year}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
     },
     investments: [],
     savingsGoals: [],
@@ -311,6 +312,7 @@ function createDemoState() {
     year: 2026,
     startBalance: 2266,
     selectedMonth: 0,
+    selectedMonthKey: "2026-01",
   };
 
   seeded.months[3].year = 2026;
@@ -523,11 +525,21 @@ function normalizePlannerState(parsed) {
   });
 
   const selectedMonthNumber = Number(normalizedProfile.selectedMonth);
-  normalizedProfile.selectedMonth = Number.isInteger(selectedMonthNumber)
+  const selectedMonthKey = String(normalizedProfile.selectedMonthKey || "").trim();
+  const selectedMonthByKey = selectedMonthKey
+    ? normalizedMonths.findIndex((month) => monthKey(month) === selectedMonthKey)
+    : -1;
+  const selectedMonthIndex = selectedMonthByKey >= 0
+    ? selectedMonthByKey
+    : Number.isInteger(selectedMonthNumber)
     && selectedMonthNumber >= 0
     && selectedMonthNumber < normalizedMonths.length
     ? selectedMonthNumber
     : Math.min(base.profile.selectedMonth, normalizedMonths.length - 1);
+  normalizedProfile.selectedMonth = selectedMonthIndex;
+  normalizedProfile.selectedMonthKey = normalizedMonths[selectedMonthIndex]
+    ? monthKey(normalizedMonths[selectedMonthIndex])
+    : "";
 
   return {
     ...base,
@@ -1405,8 +1417,18 @@ function saveState() {
 }
 
 function getSelectedMonth() {
+  const selectedMonthKey = String(state?.profile?.selectedMonthKey || "").trim();
+  if (selectedMonthKey && Array.isArray(state?.months)) {
+    const keyedIndex = state.months.findIndex((month) => monthKey(month) === selectedMonthKey);
+    if (keyedIndex >= 0) {
+      state.profile.selectedMonth = keyedIndex;
+      return state.months[keyedIndex];
+    }
+  }
+
   const selectedMonthIndex = Number(state?.profile?.selectedMonth);
   if (Array.isArray(state?.months) && state.months[selectedMonthIndex]) {
+    state.profile.selectedMonthKey = monthKey(state.months[selectedMonthIndex]);
     return state.months[selectedMonthIndex];
   }
 
@@ -1416,9 +1438,46 @@ function getSelectedMonth() {
 
   if (state?.profile) {
     state.profile.selectedMonth = 0;
+    state.profile.selectedMonthKey = monthKey(fallbackMonth);
   }
 
   return fallbackMonth;
+}
+
+function setSelectedMonth(month) {
+  if (!month || !Array.isArray(state?.months)) {
+    return;
+  }
+
+  const index = state.months.findIndex((item) => monthKey(item) === monthKey(month));
+  if (index < 0) {
+    return;
+  }
+
+  state.profile.selectedMonth = index;
+  state.profile.selectedMonthKey = monthKey(state.months[index]);
+}
+
+function ensurePlannerYearMonths(year) {
+  const normalizedYear = Number(year);
+  if (!Number.isInteger(normalizedYear) || normalizedYear <= 0) {
+    return;
+  }
+
+  MONTHS.forEach((_, index) => {
+    const exists = state.months.some((month) => Number(month.year) === normalizedYear && Number(month.id) === index);
+    if (!exists) {
+      state.months.push(createDefaultMonth(index, normalizedYear));
+    }
+  });
+
+  state.months.sort((left, right) => {
+    if (left.year !== right.year) {
+      return left.year - right.year;
+    }
+    return left.id - right.id;
+  });
+  setSelectedMonth(getSelectedMonth());
 }
 
 function ensurePlannerMonthForDate(dateString) {
@@ -1434,7 +1493,7 @@ function ensurePlannerMonthForDate(dateString) {
     return existing;
   }
 
-  const selectedMonthRef = getSelectedMonth();
+  const selectedMonthKey = monthKey(getSelectedMonth());
   const month = createDefaultMonth(monthId, year);
   state.months.push(month);
   state.months.sort((left, right) => {
@@ -1444,9 +1503,10 @@ function ensurePlannerMonthForDate(dateString) {
     return left.id - right.id;
   });
 
-  const selectedIndex = state.months.indexOf(selectedMonthRef);
+  const selectedIndex = state.months.findIndex((item) => monthKey(item) === selectedMonthKey);
   if (selectedIndex >= 0) {
     state.profile.selectedMonth = selectedIndex;
+    state.profile.selectedMonthKey = selectedMonthKey;
   }
 
   return month;
@@ -1466,10 +1526,11 @@ function getChronologicalMonths() {
 }
 
 function renderMonthOptions() {
+  const selectedMonth = getSelectedMonth();
   els.selectedMonth.innerHTML = state.months
-    .map((month, index) => `<option value="${index}">${month.name} ${month.year}</option>`)
+    .map((month) => `<option value="${monthKey(month)}">${month.name} ${month.year}</option>`)
     .join("");
-  els.selectedMonth.value = String(state.profile.selectedMonth);
+  els.selectedMonth.value = monthKey(selectedMonth);
 }
 
 function populateForms() {
@@ -1806,7 +1867,8 @@ function bindForms() {
   });
 
   els.selectedMonth.addEventListener("change", (event) => {
-    state.profile.selectedMonth = Number(event.target.value);
+    const selectedMonth = state.months.find((month) => monthKey(month) === event.target.value);
+    setSelectedMonth(selectedMonth);
     clearChartZoom();
     chartDayValue = getDefaultChartDayValue(getSelectedMonth());
     const periodDefaults = getDefaultChartPeriodValues(getSelectedMonth());
@@ -1944,7 +2006,7 @@ function bindForms() {
       year,
       startBalance: Number(data.get("startBalance") || 0),
     };
-    state.months = state.months.map((month, index) => ({ ...month, year, id: index }));
+    ensurePlannerYearMonths(year);
     saveState();
     renderMonthOptions();
     render();
@@ -2613,15 +2675,15 @@ function renderSidebar(annualStats) {
     { income: 0, out: 0, savings: 0 },
   );
 
-  const activeMonth = MONTHS[state.profile.selectedMonth];
+  const activeMonth = getSelectedMonth();
   els.sidebarSnapshot.innerHTML = `
     <div class="mini-stat">
       <span class="label-small">Mese attivo</span>
-      <strong>${activeMonth}</strong>
+      <strong>${activeMonth.name} ${activeMonth.year}</strong>
     </div>
     <div class="mini-stat">
       <span class="label-small">Rimanenze mese</span>
-      <strong>${money(annualStats.find((entry) => entry.month.id === state.profile.selectedMonth && entry.month.year === getSelectedMonth().year)?.stats.carryoverActual || 0)}</strong>
+      <strong>${money(annualStats.find((entry) => monthKey(entry.month) === monthKey(activeMonth))?.stats.carryoverActual || 0)}</strong>
     </div>
     <div class="mini-stat">
       <span class="label-small">Entrate anno</span>
@@ -2695,7 +2757,7 @@ function renderAnnualCards(annualStats) {
             </div>
           </div>
           <div class="hero-actions">
-            <button class="secondary" onclick="selectMonth(${month.id})">Apri mese</button>
+            <button class="secondary" onclick="selectMonth('${monthKey(month)}')">Apri mese</button>
           </div>
         </article>
       `;
@@ -5024,8 +5086,12 @@ document.body.addEventListener("change", (event) => {
   }
 });
 
-function selectMonth(index) {
-  state.profile.selectedMonth = index;
+function selectMonth(identifier) {
+  const selectedMonth = typeof identifier === "string"
+    ? state.months.find((month) => monthKey(month) === identifier)
+    : state.months.find((month) => month.id === Number(identifier) && month.year === getSelectedMonth().year)
+      || state.months.find((month) => month.id === Number(identifier));
+  setSelectedMonth(selectedMonth);
   clearChartZoom();
   saveState();
   render();
