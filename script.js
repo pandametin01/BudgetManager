@@ -2817,7 +2817,7 @@ function renderRunwayStats(stats) {
     : 0;
   const weekendDaySpentCurrent = relevantWeekend && isTodayWeekend
     ? allMovementEntries()
-        .filter((item) => item.type === "expense" && item.date === todayValue)
+        .filter((item) => item.type === "expense" && item.date === projectedTodayValue)
         .reduce((total, item) => total + Number(item.amount || 0), 0)
     : 0;
   const weekendRemaining = Math.max(0, weekendBudget - weekendSpentCurrent);
