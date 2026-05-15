@@ -2779,8 +2779,10 @@ function renderRunwayStats(stats) {
   const diffMs = endDate.getTime() - startDate.getTime();
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
   const weekendDays = countWeekendDays(startDate, endDate);
+  const weekendWindows = countWeekendWindows(startDate, endDate);
   const dailySpend = totalDays > 0 ? available / totalDays : 0;
   const weekendSpend = weekendDays > 0 ? available / weekendDays : 0;
+  const weekendBudget = weekendWindows > 0 ? available / weekendWindows : 0;
   const configuredDailyBudget = Number(runwayDailyBudgetValue);
   const hasConfiguredDailyBudget = runwayDailyBudgetValue !== "" && !Number.isNaN(configuredDailyBudget) && configuredDailyBudget > 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
@@ -2791,11 +2793,26 @@ function renderRunwayStats(stats) {
   const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
   const noSpendDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
   const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
+  const relevantWeekend = getRelevantWeekendRange(startDate, endDate, startDate);
+  const weekendSpentCurrent = relevantWeekend
+    ? allMovementEntries()
+        .filter((item) => item.type === "expense" && item.date >= relevantWeekend.start && item.date <= relevantWeekend.end)
+        .reduce((total, item) => total + Number(item.amount || 0), 0)
+    : 0;
+  const weekendRemaining = Math.max(0, weekendBudget - weekendSpentCurrent);
+  const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
   const recoveryNote = noSpendDays > 0
     ? todayOverspend < effectiveDailyBudget
       ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
       : `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
     : "nessuno sforamento sul giorno corrente";
+  const weekendNote = weekendWindows > 0
+    ? relevantWeekend
+      ? weekendOverspend > 0
+        ? `questo weekend hai sforato di ${money(weekendOverspend)} · ${weekendWindows} weekend nel periodo`
+        : `questo weekend restano ${money(weekendRemaining)} dopo aver speso ${money(weekendSpentCurrent)}`
+      : `${weekendWindows} weekend nel periodo · puoi usare ${money(weekendBudget)} per ciascun fine settimana`
+    : "nessun weekend nel periodo";
 
   const items = [
     {
@@ -2826,9 +2843,9 @@ function renderRunwayStats(stats) {
       note: recoveryNote,
     },
     {
-      label: "Budget solo venerdi-sabato-domenica",
-      value: weekendDays > 0 ? money(weekendSpend) : "--",
-      note: weekendDays > 0 ? `${weekendDays} giorni weekend nel periodo` : "nessun weekend nel periodo",
+      label: "Budget del fine settimana",
+      value: weekendWindows > 0 ? money(weekendBudget) : "--",
+      note: weekendNote,
     },
     {
       label: "Arrivi a zero il",
@@ -5167,6 +5184,67 @@ function countWeekendDays(startDate, endDate) {
   }
 
   return count;
+}
+
+function countWeekendWindows(startDate, endDate) {
+  if (!(startDate instanceof Date) || !(endDate instanceof Date) || Number.isNaN(startDate) || Number.isNaN(endDate)) {
+    return 0;
+  }
+  if (endDate < startDate) {
+    return 0;
+  }
+
+  const weekends = new Set();
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const last = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+  while (cursor <= last) {
+    const day = cursor.getDay();
+    if (day === 5 || day === 6 || day === 0) {
+      const friday = new Date(cursor);
+      if (day === 6) {
+        friday.setDate(friday.getDate() - 1);
+      } else if (day === 0) {
+        friday.setDate(friday.getDate() - 2);
+      }
+      weekends.add(toDateInputValue(friday));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return weekends.size;
+}
+
+function getRelevantWeekendRange(startDate, endDate, referenceDate) {
+  if (!(startDate instanceof Date) || !(endDate instanceof Date) || !(referenceDate instanceof Date)) {
+    return null;
+  }
+
+  const normalizedReference = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
+  const day = normalizedReference.getDay();
+  const friday = new Date(normalizedReference);
+
+  if (day === 6) {
+    friday.setDate(friday.getDate() - 1);
+  } else if (day === 0) {
+    friday.setDate(friday.getDate() - 2);
+  } else if (day !== 5) {
+    friday.setDate(friday.getDate() + ((5 - day + 7) % 7));
+  }
+
+  const sunday = new Date(friday);
+  sunday.setDate(sunday.getDate() + 2);
+  const clampedStart = new Date(Math.max(friday.getTime(), startDate.getTime()));
+  const clampedEnd = new Date(Math.min(sunday.getTime(), endDate.getTime()));
+
+  if (clampedStart > clampedEnd) {
+    return null;
+  }
+
+  return {
+    start: toDateInputValue(clampedStart),
+    end: toDateInputValue(clampedEnd),
+  };
 }
 
 function formatDateTime(item) {
