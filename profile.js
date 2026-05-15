@@ -22,7 +22,6 @@ const MONTHS = [
 const els = {
   currentUsername: document.getElementById("currentUsername"),
   logoutButton: document.getElementById("logoutButton"),
-  profileForm: document.getElementById("profileForm"),
   passwordForm: document.getElementById("passwordForm"),
   passwordStatus: document.getElementById("passwordStatus"),
   backupForm: document.getElementById("backupForm"),
@@ -234,70 +233,6 @@ function getCurrentUsername() {
 
 function setCurrentUsername(username) {
   sessionStorage.setItem(LOGIN_SESSION_KEY, normalizeUsername(username));
-}
-
-function monthStateKey(month) {
-  return `${month.year}-${String(month.id + 1).padStart(2, "0")}`;
-}
-
-function getSelectedMonth() {
-  const selectedMonthKey = String(state?.profile?.selectedMonthKey || "").trim();
-  if (selectedMonthKey && Array.isArray(state?.months)) {
-    const keyedIndex = state.months.findIndex((month) => monthStateKey(month) === selectedMonthKey);
-    if (keyedIndex >= 0) {
-      state.profile.selectedMonth = keyedIndex;
-      return state.months[keyedIndex];
-    }
-  }
-
-  const selectedMonthIndex = Number(state?.profile?.selectedMonth);
-  if (Array.isArray(state?.months) && state.months[selectedMonthIndex]) {
-    state.profile.selectedMonthKey = monthStateKey(state.months[selectedMonthIndex]);
-    return state.months[selectedMonthIndex];
-  }
-
-  const fallbackMonth = Array.isArray(state?.months) && state.months.length
-    ? state.months[0]
-    : createDefaultMonth(0, new Date().getFullYear());
-  state.profile.selectedMonth = 0;
-  state.profile.selectedMonthKey = monthStateKey(fallbackMonth);
-  return fallbackMonth;
-}
-
-function setSelectedMonth(month) {
-  if (!month || !Array.isArray(state?.months)) {
-    return;
-  }
-
-  const index = state.months.findIndex((item) => monthStateKey(item) === monthStateKey(month));
-  if (index < 0) {
-    return;
-  }
-
-  state.profile.selectedMonth = index;
-  state.profile.selectedMonthKey = monthStateKey(state.months[index]);
-}
-
-function ensurePlannerYearMonths(year) {
-  const normalizedYear = Number(year);
-  if (!Number.isInteger(normalizedYear) || normalizedYear <= 0) {
-    return;
-  }
-
-  MONTHS.forEach((_, index) => {
-    const exists = state.months.some((month) => Number(month.year) === normalizedYear && Number(month.id) === index);
-    if (!exists) {
-      state.months.push(createDefaultMonth(index, normalizedYear));
-    }
-  });
-
-  state.months.sort((left, right) => {
-    if (left.year !== right.year) {
-      return left.year - right.year;
-    }
-    return left.id - right.id;
-  });
-  setSelectedMonth(getSelectedMonth());
 }
 
 function getBankAuthStateStorageKey(username = getCurrentUsername()) {
@@ -590,30 +525,10 @@ async function resetAllUserData() {
 }
 
 function populateForms() {
-  els.profileForm.elements.namedItem("name").value = state.profile.name;
-  els.profileForm.elements.namedItem("currency").value = state.profile.currency;
-  els.profileForm.elements.namedItem("year").value = state.profile.year;
-  els.profileForm.elements.namedItem("startBalance").value = state.profile.startBalance;
   els.currentUsername.textContent = getCurrentUsername() || "utente";
 }
 
 function bindEvents() {
-  els.profileForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const year = Number(data.get("year")) || state.profile.year;
-    state.profile = {
-      ...state.profile,
-      name: String(data.get("name") || "").trim(),
-      currency: String(data.get("currency") || "EUR").trim().toUpperCase(),
-      year,
-      startBalance: Number(data.get("startBalance") || 0),
-    };
-    ensurePlannerYearMonths(year);
-    saveState();
-    setBackupStatus("Profilo aggiornato.", "positive");
-  });
-
   els.passwordForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
