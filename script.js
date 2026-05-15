@@ -111,6 +111,7 @@ const els = {
   kpiGrid: document.getElementById("kpiGrid"),
   runwayEndDate: document.getElementById("runwayEndDate"),
   runwayDailyBudget: document.getElementById("runwayDailyBudget"),
+  runwayNoSpendDays: document.getElementById("runwayNoSpendDays"),
   runwayStats: document.getElementById("runwayStats"),
   annualCards: document.getElementById("annualCards"),
   annualYearFilter: document.getElementById("annualYearFilter"),
@@ -177,6 +178,7 @@ let chartPeriodStartValue = "";
 let chartPeriodEndValue = "";
 let runwayEndDateValue = "";
 let runwayDailyBudgetValue = "";
+let runwayNoSpendDaysValue = 0;
 let chartZoomRange = null;
 let investmentQuotes = {};
 let investmentRefreshHandle = null;
@@ -1631,6 +1633,9 @@ function populateForms() {
   els.chartPeriodEndPicker.disabled = !((isMonthScope && chartView === "period") || isCustomScope);
   els.runwayEndDate.value = getResolvedRunwayEndDate();
   els.runwayDailyBudget.value = runwayDailyBudgetValue;
+  if (els.runwayNoSpendDays) {
+    els.runwayNoSpendDays.value = String(runwayNoSpendDaysValue || 0);
+  }
   els.movementFilterMode.value = movementFilter.mode;
   els.movementFilterStart.value = movementFilter.start;
   els.movementFilterEnd.value = movementFilter.end;
@@ -2013,6 +2018,12 @@ function bindForms() {
 
   els.runwayDailyBudget.addEventListener("input", (event) => {
     runwayDailyBudgetValue = event.target.value;
+    render();
+  });
+
+  els.runwayNoSpendDays?.addEventListener("input", (event) => {
+    const parsed = Number.parseInt(event.target.value || "0", 10);
+    runwayNoSpendDaysValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     render();
   });
 
@@ -2780,9 +2791,13 @@ function renderRunwayStats(stats) {
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
   const weekendDays = countWeekendDays(startDate, endDate);
   const weekendWindows = countWeekendWindows(startDate, endDate);
-  const dailySpend = totalDays > 0 ? available / totalDays : 0;
-  const weekendSpend = weekendDays > 0 ? available / weekendDays : 0;
-  const weekendBudget = weekendWindows > 0 ? available / weekendWindows : 0;
+  const noSpendDays = Math.max(0, Number(runwayNoSpendDaysValue || 0));
+  const adjustedSpendDays = Math.max(0, totalDays - noSpendDays);
+  const adjustedWeekendDays = Math.max(0, weekendDays - noSpendDays);
+  const adjustedWeekendWindows = Math.max(0, weekendWindows - noSpendDays);
+  const dailySpend = adjustedSpendDays > 0 ? available / adjustedSpendDays : 0;
+  const weekendSpend = adjustedWeekendDays > 0 ? available / adjustedWeekendDays : 0;
+  const weekendBudget = adjustedWeekendWindows > 0 ? available / adjustedWeekendWindows : 0;
   const configuredDailyBudget = Number(runwayDailyBudgetValue);
   const hasConfiguredDailyBudget = runwayDailyBudgetValue !== "" && !Number.isNaN(configuredDailyBudget) && configuredDailyBudget > 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
@@ -2791,7 +2806,7 @@ function renderRunwayStats(stats) {
     .reduce((total, item) => total + Number(item.amount || 0), 0);
   const todayRemaining = Math.max(0, effectiveDailyBudget - todaySpent);
   const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
-  const noSpendDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
+  const recoveryDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
   const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
   const relevantWeekend = getRelevantWeekendRange(startDate, endDate, startDate);
   const todayDay = startDate.getDay();
@@ -2810,10 +2825,10 @@ function renderRunwayStats(stats) {
   const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
   const weekendDayRemaining = Math.max(0, weekendSpend - weekendDaySpentCurrent);
   const weekendDayOverspend = Math.max(0, weekendDaySpentCurrent - weekendSpend);
-  const recoveryNote = noSpendDays > 0
+  const recoveryNote = recoveryDays > 0
     ? todayOverspend < effectiveDailyBudget
       ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
-      : `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
+      : `non devi spendere per ${recoveryDays} giorni per rientrare nel budget giornaliero`
     : "nessuno sforamento sul giorno corrente";
   const weekendDayNote = weekendDays > 0
     ? isTodayWeekend
@@ -2839,7 +2854,9 @@ function renderRunwayStats(stats) {
     {
       label: "Budget massimo al giorno",
       value: totalDays > 0 ? money(dailySpend) : "--",
-      note: totalDays > 0 ? `${totalDays} giorni fino al termine` : "scegli una data finale valida",
+      note: totalDays > 0
+        ? `${adjustedSpendDays} giorni spendibili fino al termine${noSpendDays > 0 ? ` · ${noSpendDays} giorni a spesa zero` : ""}`
+        : "scegli una data finale valida",
     },
     {
       label: "Limite giornaliero attivo",
@@ -2855,7 +2872,7 @@ function renderRunwayStats(stats) {
     },
     {
       label: "Recupero sforamento",
-      value: noSpendDays > 0 ? `${noSpendDays} giorni` : "In linea",
+      value: recoveryDays > 0 ? `${recoveryDays} giorni` : "In linea",
       note: recoveryNote,
     },
     {
