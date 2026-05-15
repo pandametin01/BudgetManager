@@ -183,17 +183,7 @@ let supabaseSession = null;
 let remoteSaveHandle = null;
 const MOVEMENT_RENDER_BATCH_SIZE = 250;
 let movementVisibleLimit = MOVEMENT_RENDER_BATCH_SIZE;
-let movementFilter = {
-  mode: "selected-month",
-  start: "",
-  end: "",
-  type: "all",
-  category: "all",
-  note: "",
-  minAmount: "",
-  maxAmount: "",
-  sortBy: "date-desc",
-};
+let movementFilter = createDefaultMovementFilter();
 
 bootstrap();
 
@@ -1702,6 +1692,21 @@ function resetMovementVisibleLimit() {
   movementVisibleLimit = MOVEMENT_RENDER_BATCH_SIZE;
 }
 
+function createDefaultMovementFilter() {
+  const today = toDateInputValue(new Date());
+  return {
+    mode: "date-range",
+    start: today,
+    end: today,
+    type: "all",
+    category: "all",
+    note: "",
+    minAmount: "",
+    maxAmount: "",
+    sortBy: "date-desc",
+  };
+}
+
 function getDefaultEntryDate(month) {
   const today = new Date();
   const isSameMonth = today.getFullYear() === month.year && today.getMonth() === month.id;
@@ -2299,7 +2304,7 @@ function bindActions() {
         state = buildAccountState(createDefaultState(), getCurrentUsername());
         activeCategoryFilter = "";
         clearChartZoom();
-        movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+        movementFilter = createDefaultMovementFilter();
         saveState();
         renderMonthOptions();
         populateForms();
@@ -2487,7 +2492,7 @@ async function applyAuthState() {
     activeCategoryFilter = "";
     setSidebarOpen(false);
     clearChartZoom();
-    movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+    movementFilter = createDefaultMovementFilter();
     if (els.currentUsername) {
       els.currentUsername.textContent = "";
     }
@@ -2503,7 +2508,7 @@ async function applyAuthState() {
   state = await loadState();
   activeCategoryFilter = "";
   clearChartZoom();
-  movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+  movementFilter = createDefaultMovementFilter();
   if (els.currentUsername) {
     els.currentUsername.textContent = getCurrentUsername();
   }
