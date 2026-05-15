@@ -2794,18 +2794,34 @@ function renderRunwayStats(stats) {
   const noSpendDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
   const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
   const relevantWeekend = getRelevantWeekendRange(startDate, endDate, startDate);
+  const todayDay = startDate.getDay();
+  const isTodayWeekend = todayDay === 5 || todayDay === 6 || todayDay === 0;
   const weekendSpentCurrent = relevantWeekend
     ? allMovementEntries()
         .filter((item) => item.type === "expense" && item.date >= relevantWeekend.start && item.date <= relevantWeekend.end)
         .reduce((total, item) => total + Number(item.amount || 0), 0)
     : 0;
+  const weekendDaySpentCurrent = relevantWeekend && isTodayWeekend
+    ? allMovementEntries()
+        .filter((item) => item.type === "expense" && item.date === todayValue)
+        .reduce((total, item) => total + Number(item.amount || 0), 0)
+    : 0;
   const weekendRemaining = Math.max(0, weekendBudget - weekendSpentCurrent);
   const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
+  const weekendDayRemaining = Math.max(0, weekendSpend - weekendDaySpentCurrent);
+  const weekendDayOverspend = Math.max(0, weekendDaySpentCurrent - weekendSpend);
   const recoveryNote = noSpendDays > 0
     ? todayOverspend < effectiveDailyBudget
       ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
       : `non devi spendere per ${noSpendDays} giorni per rientrare nel budget giornaliero`
     : "nessuno sforamento sul giorno corrente";
+  const weekendDayNote = weekendDays > 0
+    ? isTodayWeekend
+      ? weekendDayOverspend > 0
+        ? `oggi hai sforato il budget weekend giornaliero di ${money(weekendDayOverspend)}`
+        : `oggi nel budget weekend giornaliero restano ${money(weekendDayRemaining)} dopo aver speso ${money(weekendDaySpentCurrent)}`
+      : `su ciascun giorno weekend puoi usare ${money(weekendSpend)}`
+    : "nessun giorno weekend nel periodo";
   const weekendNote = weekendWindows > 0
     ? relevantWeekend
       ? weekendOverspend > 0
@@ -2843,14 +2859,14 @@ function renderRunwayStats(stats) {
       note: recoveryNote,
     },
     {
+      label: "Budget singolo giorno weekend",
+      value: weekendDays > 0 ? money(weekendSpend) : "--",
+      note: weekendDayNote,
+    },
+    {
       label: "Budget del fine settimana",
       value: weekendWindows > 0 ? money(weekendBudget) : "--",
       note: weekendNote,
-    },
-    {
-      label: "Arrivi a zero il",
-      value: formatDate(endDateValue),
-      note: "stimando di usare tutto il disponibile entro quella data",
     },
   ];
 
