@@ -907,7 +907,12 @@ function detectCsvProvider(headers) {
   if (joined.includes("booking date") && joined.includes("amount eur")) {
     return "N26";
   }
-  if (joined.includes("completed date") || joined.includes("started date") || joined.includes("description")) {
+  if (
+    joined.includes("completed date") ||
+    joined.includes("started date") ||
+    joined.includes("data di completamento") ||
+    (joined.includes("descrizione") && joined.includes("importo"))
+  ) {
     return "Revolut";
   }
   return "CSV";
@@ -981,8 +986,22 @@ function collectExistingMovementImportKeys() {
 }
 
 function extractCsvMovement(row, provider, rowIndex) {
+  const status = csvValue(row, ["State", "Status", "Stato"]);
+  if (status && !/^(completed|completato|booked|settled)$/i.test(status)) {
+    return null;
+  }
+
   const dateTime = parseCsvDateTime(
-    csvValue(row, ["Booking Date", "Completed Date", "Started Date", "Date", "Data", "Value Date"]),
+    csvValue(row, [
+      "Booking Date",
+      "Completed Date",
+      "Started Date",
+      "Data di completamento",
+      "Data di inizio",
+      "Date",
+      "Data",
+      "Value Date",
+    ]),
   );
   const amountValue = csvValue(row, ["Amount (EUR)", "Amount", "Importo", "Amount EUR"]);
   const signedAmount = parseCsvAmount(amountValue);
@@ -990,11 +1009,11 @@ function extractCsvMovement(row, provider, rowIndex) {
     return null;
   }
 
-  const partnerName = csvValue(row, ["Partner Name", "Partner", "Description", "Beneficiary", "Merchant"]);
+  const partnerName = csvValue(row, ["Partner Name", "Partner", "Description", "Descrizione", "Beneficiary", "Merchant"]);
   const paymentReference = csvValue(row, ["Payment Reference", "Reference", "Notes", "Note"]);
-  const rowType = csvValue(row, ["Type", "Transaction Type"]);
-  const accountName = csvValue(row, ["Account Name", "Product", "Account"]);
-  const originalCurrency = csvValue(row, ["Original Currency", "Currency"]);
+  const rowType = csvValue(row, ["Type", "Tipo", "Transaction Type"]);
+  const accountName = csvValue(row, ["Account Name", "Product", "Prodotto", "Account"]);
+  const originalCurrency = csvValue(row, ["Original Currency", "Currency", "Valuta"]);
   const noteParts = uniqueNonEmptyParts([provider, partnerName, paymentReference, rowType, accountName]);
   const note = noteParts.join(" - ") || `${provider} - Movimento CSV`;
   const type = signedAmount >= 0 ? "income" : "expense";
