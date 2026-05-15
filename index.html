@@ -55,7 +55,9 @@
     </section>
 
     <div id="pageShell" class="page-shell hidden-shell">
-      <aside class="sidebar">
+      <button class="sidebar-toggle" type="button" data-action="toggle-sidebar" aria-controls="sidebarPanel" aria-expanded="false" aria-label="Apri menu">☰</button>
+      <div class="sidebar-overlay" data-action="close-sidebar"></div>
+      <aside id="sidebarPanel" class="sidebar" aria-label="Menu principale">
         <div class="brand">
           <span class="brand-mark">BP</span>
           <div>

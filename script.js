@@ -2257,8 +2257,32 @@ function bindForms() {
   });
 }
 
+function setSidebarOpen(open) {
+  if (!els.pageShell) {
+    return;
+  }
+
+  els.pageShell.classList.toggle("sidebar-open", Boolean(open));
+  const toggle = els.pageShell.querySelector("[data-action='toggle-sidebar']");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(Boolean(open)));
+    toggle.setAttribute("aria-label", open ? "Chiudi menu" : "Apri menu");
+  }
+}
+
 function bindActions() {
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setSidebarOpen(false);
+    }
+  });
+
   document.body.addEventListener("click", (event) => {
+    if (event.target.closest(".sidebar-nav a")) {
+      setSidebarOpen(false);
+      return;
+    }
+
     const action = event.target.closest("[data-action]")?.dataset.action;
     if (!action) {
       return;
@@ -2298,6 +2322,16 @@ function bindActions() {
     if (action === "reset-chart-zoom") {
       clearChartZoom();
       render();
+      return;
+    }
+
+    if (action === "toggle-sidebar") {
+      setSidebarOpen(!els.pageShell.classList.contains("sidebar-open"));
+      return;
+    }
+
+    if (action === "close-sidebar") {
+      setSidebarOpen(false);
       return;
     }
 
@@ -2451,6 +2485,7 @@ async function applyAuthState() {
     state = createDefaultState();
     hasPlayedDashboardSlotAnimation = false;
     activeCategoryFilter = "";
+    setSidebarOpen(false);
     clearChartZoom();
     movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
     if (els.currentUsername) {
