@@ -3706,15 +3706,6 @@ function renderCartesianChart(item, month, zoomRange) {
       <polygon class="chart-area" points="${areaPoints}"></polygon>
       <polyline class="chart-line" points="${linePoints}"></polyline>
       <rect class="chart-selection" x="${padding.left}" y="${padding.top}" width="0" height="${chartHeight}" style="display:none"></rect>
-      ${points
-        .map(
-          (point) => `
-            <circle class="chart-point" cx="${xForPosition(point.position)}" cy="${yForValue(point.remaining)}" r="5">
-              <title>${escapeAttribute(point.label)}</title>
-            </circle>
-          `,
-        )
-        .join("")}
       ${movementDotMarkup}
       ${chartView === "month"
         ? xTicks
