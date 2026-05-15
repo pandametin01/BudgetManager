@@ -112,6 +112,7 @@ const els = {
   runwayEndDate: document.getElementById("runwayEndDate"),
   runwayDailyBudget: document.getElementById("runwayDailyBudget"),
   runwayNoSpendDays: document.getElementById("runwayNoSpendDays"),
+  runwayIncludeFriday: document.getElementById("runwayIncludeFriday"),
   runwayStats: document.getElementById("runwayStats"),
   annualCards: document.getElementById("annualCards"),
   annualYearFilter: document.getElementById("annualYearFilter"),
@@ -179,6 +180,7 @@ let chartPeriodEndValue = "";
 let runwayEndDateValue = "";
 let runwayDailyBudgetValue = "";
 let runwayNoSpendDaysValue = 0;
+let runwayIncludeFridayValue = true;
 let chartZoomRange = null;
 let investmentQuotes = {};
 let investmentRefreshHandle = null;
@@ -1636,6 +1638,9 @@ function populateForms() {
   if (els.runwayNoSpendDays) {
     els.runwayNoSpendDays.value = String(runwayNoSpendDaysValue || 0);
   }
+  if (els.runwayIncludeFriday) {
+    els.runwayIncludeFriday.checked = runwayIncludeFridayValue;
+  }
   els.movementFilterMode.value = movementFilter.mode;
   els.movementFilterStart.value = movementFilter.start;
   els.movementFilterEnd.value = movementFilter.end;
@@ -2024,6 +2029,11 @@ function bindForms() {
   els.runwayNoSpendDays?.addEventListener("input", (event) => {
     const parsed = Number.parseInt(event.target.value || "0", 10);
     runwayNoSpendDaysValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    render();
+  });
+
+  els.runwayIncludeFriday?.addEventListener("change", (event) => {
+    runwayIncludeFridayValue = Boolean(event.target.checked);
     render();
   });
 
@@ -2792,8 +2802,8 @@ function renderRunwayStats(stats) {
   const projectedTodayValue = toDateInputValue(projectedStartDate);
   const diffMs = endDate.getTime() - projectedStartDate.getTime();
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
-  const weekendDays = countWeekendDays(projectedStartDate, endDate);
-  const weekendWindows = countWeekendWindows(projectedStartDate, endDate);
+  const weekendDays = countWeekendDays(projectedStartDate, endDate, runwayIncludeFridayValue);
+  const weekendWindows = countWeekendWindows(projectedStartDate, endDate, runwayIncludeFridayValue);
   const dailySpend = totalDays > 0 ? available / totalDays : 0;
   const weekendSpend = weekendDays > 0 ? available / weekendDays : 0;
   const weekendBudget = weekendWindows > 0 ? available / weekendWindows : 0;
@@ -2807,9 +2817,11 @@ function renderRunwayStats(stats) {
   const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
   const recoveryDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
   const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
-  const relevantWeekend = getRelevantWeekendRange(projectedStartDate, endDate, projectedStartDate);
+  const relevantWeekend = getRelevantWeekendRange(projectedStartDate, endDate, projectedStartDate, runwayIncludeFridayValue);
   const todayDay = projectedStartDate.getDay();
-  const isTodayWeekend = todayDay === 5 || todayDay === 6 || todayDay === 0;
+  const isTodayWeekend = runwayIncludeFridayValue
+    ? (todayDay === 5 || todayDay === 6 || todayDay === 0)
+    : (todayDay === 6 || todayDay === 0);
   const weekendSpentCurrent = relevantWeekend
     ? allMovementEntries()
         .filter((item) => item.type === "expense" && item.date >= relevantWeekend.start && item.date <= relevantWeekend.end)
@@ -5197,7 +5209,7 @@ function toDateTimeLocal(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function countWeekendDays(startDate, endDate) {
+function countWeekendDays(startDate, endDate, includeFriday = true) {
   if (!(startDate instanceof Date) || !(endDate instanceof Date) || Number.isNaN(startDate) || Number.isNaN(endDate)) {
     return 0;
   }
@@ -5211,7 +5223,7 @@ function countWeekendDays(startDate, endDate) {
 
   while (cursor <= last) {
     const day = cursor.getDay();
-    if (day === 5 || day === 6 || day === 0) {
+    if ((includeFriday && (day === 5 || day === 6 || day === 0)) || (!includeFriday && (day === 6 || day === 0))) {
       count += 1;
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -5220,7 +5232,7 @@ function countWeekendDays(startDate, endDate) {
   return count;
 }
 
-function countWeekendWindows(startDate, endDate) {
+function countWeekendWindows(startDate, endDate, includeFriday = true) {
   if (!(startDate instanceof Date) || !(endDate instanceof Date) || Number.isNaN(startDate) || Number.isNaN(endDate)) {
     return 0;
   }
@@ -5234,12 +5246,16 @@ function countWeekendWindows(startDate, endDate) {
 
   while (cursor <= last) {
     const day = cursor.getDay();
-    if (day === 5 || day === 6 || day === 0) {
+    if ((includeFriday && (day === 5 || day === 6 || day === 0)) || (!includeFriday && (day === 6 || day === 0))) {
       const friday = new Date(cursor);
-      if (day === 6) {
-        friday.setDate(friday.getDate() - 1);
+      if (includeFriday) {
+        if (day === 6) {
+          friday.setDate(friday.getDate() - 1);
+        } else if (day === 0) {
+          friday.setDate(friday.getDate() - 2);
+        }
       } else if (day === 0) {
-        friday.setDate(friday.getDate() - 2);
+        friday.setDate(friday.getDate() - 1);
       }
       weekends.add(toDateInputValue(friday));
     }
@@ -5249,7 +5265,7 @@ function countWeekendWindows(startDate, endDate) {
   return weekends.size;
 }
 
-function getRelevantWeekendRange(startDate, endDate, referenceDate) {
+function getRelevantWeekendRange(startDate, endDate, referenceDate, includeFriday = true) {
   if (!(startDate instanceof Date) || !(endDate instanceof Date) || !(referenceDate instanceof Date)) {
     return null;
   }
@@ -5258,16 +5274,22 @@ function getRelevantWeekendRange(startDate, endDate, referenceDate) {
   const day = normalizedReference.getDay();
   const friday = new Date(normalizedReference);
 
-  if (day === 6) {
-    friday.setDate(friday.getDate() - 1);
+  if (includeFriday) {
+    if (day === 6) {
+      friday.setDate(friday.getDate() - 1);
+    } else if (day === 0) {
+      friday.setDate(friday.getDate() - 2);
+    } else if (day !== 5) {
+      friday.setDate(friday.getDate() + ((5 - day + 7) % 7));
+    }
   } else if (day === 0) {
-    friday.setDate(friday.getDate() - 2);
-  } else if (day !== 5) {
-    friday.setDate(friday.getDate() + ((5 - day + 7) % 7));
+    friday.setDate(friday.getDate() - 1);
+  } else if (day !== 6) {
+    friday.setDate(friday.getDate() + ((6 - day + 7) % 7));
   }
 
   const sunday = new Date(friday);
-  sunday.setDate(sunday.getDate() + 2);
+  sunday.setDate(sunday.getDate() + (includeFriday ? 2 : 1));
   const clampedStart = new Date(Math.max(friday.getTime(), startDate.getTime()));
   const clampedEnd = new Date(Math.min(sunday.getTime(), endDate.getTime()));
 
