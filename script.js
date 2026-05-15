@@ -131,6 +131,8 @@ const els = {
   movementFilterMinAmount: document.getElementById("movementFilterMinAmount"),
   movementFilterMaxAmount: document.getElementById("movementFilterMaxAmount"),
   movementSortBy: document.getElementById("movementSortBy"),
+  csvImportInput: document.getElementById("csvImportInput"),
+  csvImportStatus: document.getElementById("csvImportStatus"),
   sidebarSnapshot: document.getElementById("sidebarSnapshot"),
   incomeCount: document.getElementById("incomeCount"),
   billCount: document.getElementById("billCount"),
@@ -718,6 +720,388 @@ async function pushCurrentStateToSupabase() {
   setBackupStatus("Stato attuale caricato su Supabase.", "positive");
 }
 
+function setCsvImportStatus(message, tone = "") {
+  if (!els.csvImportStatus) {
+    return;
+  }
+  els.csvImportStatus.textContent = message || "";
+  els.csvImportStatus.className = tone ? `list-meta csv-import-status ${tone}` : "list-meta csv-import-status";
+}
+
+function detectCsvDelimiter(text) {
+  const source = String(text || "");
+  const counts = { ",": 0, ";": 0, "\t": 0 };
+  let inQuotes = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const nextChar = source[index + 1];
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      break;
+    }
+    if (!inQuotes && Object.prototype.hasOwnProperty.call(counts, char)) {
+      counts[char] += 1;
+    }
+  }
+
+  return Object.entries(counts).sort((left, right) => right[1] - left[1])[0]?.[0] || ",";
+}
+
+function parseCsvText(text, delimiter = ",") {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+  const source = String(text || "").replace(/^\uFEFF/, "");
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const nextChar = source[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        index += 1;
+      }
+      row.push(cell);
+      if (row.some((value) => String(value).trim())) {
+        rows.push(row);
+      }
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell);
+  if (row.some((value) => String(value).trim())) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeCsvHeader(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9 ]/g, "");
+}
+
+function parseCsvObjects(text) {
+  const rows = parseCsvText(text, detectCsvDelimiter(text));
+  if (rows.length < 2) {
+    return { headers: [], rows: [] };
+  }
+
+  const headers = rows[0].map(normalizeCsvHeader);
+  return {
+    headers,
+    rows: rows.slice(1).map((values) => {
+      const item = {};
+      headers.forEach((header, index) => {
+        item[header] = String(values[index] ?? "").trim();
+      });
+      return item;
+    }),
+  };
+}
+
+function csvValue(row, aliases) {
+  for (const alias of aliases) {
+    const value = row[normalizeCsvHeader(alias)];
+    if (String(value || "").trim()) {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function parseCsvAmount(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return NaN;
+  }
+
+  let normalized = raw
+    .replace(/\s/g, "")
+    .replace(/[€$£]/g, "")
+    .replace(/^\((.*)\)$/, "-$1");
+
+  const hasComma = normalized.includes(",");
+  const hasDot = normalized.includes(".");
+  if (hasComma && hasDot) {
+    const lastComma = normalized.lastIndexOf(",");
+    const lastDot = normalized.lastIndexOf(".");
+    normalized = lastComma > lastDot
+      ? normalized.replace(/\./g, "").replace(",", ".")
+      : normalized.replace(/,/g, "");
+  } else if (hasComma) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  return Number(normalized);
+}
+
+function parseCsvDateTime(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return { date: "", time: "" };
+  }
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (isoMatch) {
+    return {
+      date: `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`,
+      time: isoMatch[4] ? `${isoMatch[4]}:${isoMatch[5]}` : "",
+    };
+  }
+
+  const localMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (localMatch) {
+    return {
+      date: `${localMatch[3]}-${String(localMatch[2]).padStart(2, "0")}-${String(localMatch[1]).padStart(2, "0")}`,
+      time: localMatch[4] ? `${String(localMatch[4]).padStart(2, "0")}:${localMatch[5]}` : "",
+    };
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return { date: "", time: "" };
+  }
+
+  return {
+    date: toDateInputValue(parsed),
+    time: `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`,
+  };
+}
+
+function detectCsvProvider(headers) {
+  const joined = headers.join("|");
+  if (joined.includes("booking date") && joined.includes("amount eur")) {
+    return "N26";
+  }
+  if (joined.includes("completed date") || joined.includes("started date") || joined.includes("description")) {
+    return "Revolut";
+  }
+  return "CSV";
+}
+
+function uniqueNonEmptyParts(parts) {
+  const seen = new Set();
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const key = part.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function suggestCsvCategory(text) {
+  const normalized = lowerText(text);
+  const existingCategories = getCategorySuggestions();
+  const exactExisting = existingCategories.find((category) => normalized.includes(lowerText(category)));
+  if (exactExisting) {
+    return exactExisting;
+  }
+
+  const rules = [
+    { category: "Food & Drink", pattern: /(bar|caffe|caff[eè]|ristor|pizz|deliveroo|glovo|mcdonald|burger|sushi|pub|tavola|food|drink)/i },
+    { category: "Spesa", pattern: /(lidl|conad|coop|supermerc|market|gala|si con te|eurospin|alimentari|macelleria)/i },
+    { category: "Trasporti", pattern: /(trenitalia|train|bus|taxi|uber|bolt|eni|q8|ip |parking|parcheggio|trasport)/i },
+    { category: "Abbonamenti", pattern: /(apple|spotify|netflix|amazon prime|google|openai|chatgpt|subscription|abbon)/i },
+    { category: "Telefono", pattern: /(iliad|vodafone|tim|windtre|wind|telefono|mobile)/i },
+    { category: "Bonifici privati", pattern: /(moneybeam|bonifico|transfer|sepa|inviato da|sent from)/i },
+    { category: "Viaggi", pattern: /(hotel|airbnb|booking|ryanair|easyjet|aeroporto|airport|viaggi)/i },
+    { category: "Fun", pattern: /(cinema|pub|game|steam|playstation|xbox|evento|ticket|club|fun)/i },
+  ];
+  const match = rules.find((rule) => rule.pattern.test(text));
+  return match?.category || "Varie";
+}
+
+function normalizeCsvCompareText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function createCsvMovementSignature(item) {
+  return [
+    item.date,
+    item.type,
+    Number(item.amount || 0).toFixed(2),
+    normalizeCsvCompareText(item.note),
+  ].join("|");
+}
+
+function collectExistingMovementImportKeys() {
+  const signatures = new Set();
+  const externalIds = new Set();
+  state.months.forEach((month) => {
+    (month.transactions || []).forEach((transaction) => {
+      signatures.add(createCsvMovementSignature(transaction));
+      if (transaction.bankExternalId) {
+        externalIds.add(String(transaction.bankExternalId));
+      }
+    });
+  });
+  return { signatures, externalIds };
+}
+
+function extractCsvMovement(row, provider, rowIndex) {
+  const dateTime = parseCsvDateTime(
+    csvValue(row, ["Booking Date", "Completed Date", "Started Date", "Date", "Data", "Value Date"]),
+  );
+  const amountValue = csvValue(row, ["Amount (EUR)", "Amount", "Importo", "Amount EUR"]);
+  const signedAmount = parseCsvAmount(amountValue);
+  if (!dateTime.date || !Number.isFinite(signedAmount) || signedAmount === 0) {
+    return null;
+  }
+
+  const partnerName = csvValue(row, ["Partner Name", "Partner", "Description", "Beneficiary", "Merchant"]);
+  const paymentReference = csvValue(row, ["Payment Reference", "Reference", "Notes", "Note"]);
+  const rowType = csvValue(row, ["Type", "Transaction Type"]);
+  const accountName = csvValue(row, ["Account Name", "Product", "Account"]);
+  const originalCurrency = csvValue(row, ["Original Currency", "Currency"]);
+  const noteParts = uniqueNonEmptyParts([provider, partnerName, paymentReference, rowType, accountName]);
+  const note = noteParts.join(" - ") || `${provider} - Movimento CSV`;
+  const type = signedAmount >= 0 ? "income" : "expense";
+  const amount = Number(Math.abs(signedAmount).toFixed(2));
+  const externalId = [
+    provider,
+    dateTime.date,
+    signedAmount.toFixed(2),
+    normalizeCsvCompareText(note),
+    rowIndex,
+  ].join("|");
+
+  return {
+    id: crypto.randomUUID(),
+    date: dateTime.date,
+    time: dateTime.time,
+    type,
+    category: type === "income" ? "Entrate" : suggestCsvCategory(`${partnerName} ${paymentReference} ${rowType}`),
+    amount,
+    note,
+    bankExternalId: externalId,
+    bankDirection: signedAmount >= 0 ? "Credito" : "Debito",
+    bankTransactionId: "",
+    bankEntryReference: paymentReference,
+    creditorName: signedAmount < 0 ? partnerName : "",
+    debtorName: signedAmount >= 0 ? partnerName : "",
+    currency: originalCurrency || state.profile.currency || "EUR",
+  };
+}
+
+function addCsvMovementToPlanner(movement) {
+  const month = ensurePlannerMonthForDate(movement.date);
+  if (!month) {
+    return false;
+  }
+
+  if (movement.type === "expense" && movement.category && !(month.categoryBudgets || []).some((entry) => entry.name === movement.category)) {
+    month.categoryBudgets = month.categoryBudgets || [];
+    month.categoryBudgets.unshift({
+      id: crypto.randomUUID(),
+      name: movement.category,
+      budget: 0,
+      isUndefinedBudget: true,
+    });
+  }
+
+  month.transactions = month.transactions || [];
+  month.transactions.unshift(movement);
+  return true;
+}
+
+async function importCsvMovements(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+    setCsvImportStatus(`Sto leggendo ${file.name}...`);
+    const text = await file.text();
+    const parsed = parseCsvObjects(text);
+    if (!parsed.rows.length) {
+      throw new Error("Il CSV non contiene righe importabili.");
+    }
+
+    const provider = detectCsvProvider(parsed.headers);
+    const existingImportKeys = collectExistingMovementImportKeys();
+    let importedCount = 0;
+    let duplicateCount = 0;
+    let skippedCount = 0;
+
+    parsed.rows.forEach((row, index) => {
+      const movement = extractCsvMovement(row, provider, index + 2);
+      if (!movement) {
+        skippedCount += 1;
+        return;
+      }
+
+      const signature = createCsvMovementSignature(movement);
+      if (existingImportKeys.externalIds.has(movement.bankExternalId) || existingImportKeys.signatures.has(signature)) {
+        duplicateCount += 1;
+        return;
+      }
+
+      if (addCsvMovementToPlanner(movement)) {
+        existingImportKeys.externalIds.add(movement.bankExternalId);
+        importedCount += 1;
+      } else {
+        skippedCount += 1;
+      }
+    });
+
+    if (!importedCount) {
+      setCsvImportStatus(`Nessun nuovo movimento importato da ${provider}. Duplicati: ${duplicateCount}, scartati: ${skippedCount}.`, "negative");
+      return;
+    }
+
+    saveState();
+    renderMonthOptions();
+    populateForms();
+    render();
+    setCsvImportStatus(`Import ${provider} completato: ${importedCount} movimenti inseriti, ${duplicateCount} duplicati ignorati, ${skippedCount} righe scartate.`, "positive");
+  } catch (error) {
+    console.error("Errore import CSV movimenti", error);
+    setCsvImportStatus(error.message || "Import CSV non riuscito.", "negative");
+  }
+}
+
 function initializeAccountsStore() {
   const accounts = getAccounts();
   const legacyState = loadLegacyState();
@@ -987,6 +1371,37 @@ function getSelectedMonth() {
   }
 
   return fallbackMonth;
+}
+
+function ensurePlannerMonthForDate(dateString) {
+  const [yearText, monthText] = String(dateString || "").split("-");
+  const year = Number(yearText);
+  const monthId = Number(monthText) - 1;
+  if (!Number.isInteger(year) || !Number.isInteger(monthId) || monthId < 0 || monthId > 11) {
+    return null;
+  }
+
+  const existing = state.months.find((month) => Number(month.year) === year && Number(month.id) === monthId);
+  if (existing) {
+    return existing;
+  }
+
+  const selectedMonthRef = getSelectedMonth();
+  const month = createDefaultMonth(monthId, year);
+  state.months.push(month);
+  state.months.sort((left, right) => {
+    if (left.year !== right.year) {
+      return left.year - right.year;
+    }
+    return left.id - right.id;
+  });
+
+  const selectedIndex = state.months.indexOf(selectedMonthRef);
+  if (selectedIndex >= 0) {
+    state.profile.selectedMonth = selectedIndex;
+  }
+
+  return month;
 }
 
 function monthKey(month) {
@@ -1532,6 +1947,12 @@ function bindForms() {
     event.target.value = "";
   });
 
+  els.csvImportInput?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    await importCsvMovements(file);
+    event.target.value = "";
+  });
+
   els.incomeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -1585,8 +2006,8 @@ function bindForms() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const date = String(data.get("date"));
-    const monthId = Number(date.split("-")[1]) - 1;
-    state.months[monthId].transactions.unshift({
+    const targetMonth = ensurePlannerMonthForDate(date) || getSelectedMonth();
+    targetMonth.transactions.unshift({
       id: crypto.randomUUID(),
       date,
       time: String(data.get("time") || "").trim(),
@@ -1685,6 +2106,11 @@ function bindActions() {
 
     if (action === "import-backup") {
       els.backupFileInput?.click();
+      return;
+    }
+
+    if (action === "import-csv-movements") {
+      els.csvImportInput?.click();
       return;
     }
 

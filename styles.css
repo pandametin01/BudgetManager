@@ -428,6 +428,10 @@ button:hover {
   margin-top: 18px;
 }
 
+.csv-import-status {
+  margin: 12px 0 0;
+}
+
 .archive-filters label {
   display: grid;
   gap: 8px;

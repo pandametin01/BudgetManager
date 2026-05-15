@@ -355,11 +355,14 @@
             </div>
             <div class="archive-tools">
               <span id="activeCategoryFilter" class="pill-note">Filtro: tutte le categorie</span>
+              <input id="csvImportInput" type="file" accept=".csv,text/csv" hidden />
+              <button class="secondary" type="button" data-action="import-csv-movements">Importa CSV</button>
               <button class="secondary" data-action="clear-category-filter">Mostra tutto</button>
               <button class="panel-toggle" type="button" data-action="toggle-panel" data-panel-id="movement-archive" aria-expanded="true" aria-label="Apri o chiudi archivio movimenti">›</button>
             </div>
           </div>
           <div class="panel-collapsible-content">
+          <p id="csvImportStatus" class="list-meta csv-import-status"></p>
           <div class="archive-filters">
             <label>
               Vista
