@@ -168,7 +168,7 @@ const els = {
 
 let state = createDefaultState();
 let activeCategoryFilter = "";
-let annualYearFilter = "all";
+let annualYearFilter = String(new Date().getFullYear());
 let chartScope = "month";
 let chartView = "month";
 let chartYearValue = String(new Date().getFullYear());
@@ -1614,6 +1614,10 @@ function populateForms() {
     '<option value="all">Tutti gli anni</option>',
     ...availableYears.map((year) => `<option value="${year}">${year}</option>`),
   ].join("");
+  const defaultAnnualYear = String(new Date().getFullYear());
+  if (annualYearFilter !== "all" && !availableYears.includes(Number(annualYearFilter))) {
+    annualYearFilter = availableYears.includes(Number(defaultAnnualYear)) ? defaultAnnualYear : "all";
+  }
   els.annualYearFilter.value = availableYears.includes(Number(annualYearFilter)) || annualYearFilter === "all"
     ? annualYearFilter
     : "all";
