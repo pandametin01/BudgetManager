@@ -21,6 +21,14 @@ const MONTHS = [
   "Novembre",
   "Dicembre",
 ];
+const FIXED_CATEGORIES = [
+  "Macchina",
+  "Carburante",
+  "Parrucchiere",
+  "Bicicletta",
+  "Sigarette",
+  "Abbigliamento",
+];
 
 const REVOLUT_MAY_TIMES = {
   "2026-05-02|35.33|Revolut · Deliveroo": "11:05",
@@ -175,6 +183,8 @@ let hasPlayedDashboardSlotAnimation = false;
 let supabaseClient = null;
 let supabaseSession = null;
 let remoteSaveHandle = null;
+const MOVEMENT_RENDER_BATCH_SIZE = 250;
+let movementVisibleLimit = MOVEMENT_RENDER_BATCH_SIZE;
 let movementFilter = {
   mode: "selected-month",
   start: "",
@@ -995,6 +1005,12 @@ function suggestCsvCategory(text) {
     { category: "Bonifici privati", pattern: /(moneybeam|bonifico|transfer|sepa|inviato da|sent from)/i },
     { category: "Viaggi", pattern: /(hotel|airbnb|booking|ryanair|easyjet|aeroporto|airport|viaggi)/i },
     { category: "Fun", pattern: /(cinema|pub|game|steam|playstation|xbox|evento|ticket|club|fun)/i },
+    { category: "Macchina", pattern: /(auto|macchina|meccanico|officina|gommista|assicurazione auto|bollo auto|revisione)/i },
+    { category: "Carburante", pattern: /(carburante|benzina|diesel|gasolio|q8|eni|ip |tamoil|esso|agip|distributore)/i },
+    { category: "Parrucchiere", pattern: /(parrucch|barber|barbiere|hair|salone)/i },
+    { category: "Bicicletta", pattern: /(bici|bicicletta|bike|cicli|ciclismo|vibici)/i },
+    { category: "Sigarette", pattern: /(sigarette|tabacchi|tabaccheria|tobacco|iqos|terea|heets)/i },
+    { category: "Abbigliamento", pattern: /(abbigliamento|vestiti|zara|h&m|ovs|nike|adidas|zalando|scarpe|clothing)/i },
   ];
   const match = rules.find((rule) => rule.pattern.test(text));
   return match?.category || "Varie";
@@ -1272,6 +1288,51 @@ async function deleteRemoteBankTransactionLink(transaction) {
     }
   } catch (error) {
     console.error("Errore cancellazione collegamento transazione bancaria", error);
+  }
+}
+
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function deleteRemoteBankTransactionLinks(transactions) {
+  if (!supabaseClient || !supabaseSession?.user?.id || !transactions?.length) {
+    return;
+  }
+
+  const plannerTransactionIds = [...new Set(transactions.map((transaction) => String(transaction?.id || "").trim()).filter(Boolean))];
+  const externalTransactionIds = [...new Set(transactions.map((transaction) => String(transaction?.bankExternalId || "").trim()).filter(Boolean))];
+
+  try {
+    for (const ids of chunkArray(plannerTransactionIds, 500)) {
+      const result = await supabaseClient
+        .from("bank_transactions")
+        .delete()
+        .eq("user_id", supabaseSession.user.id)
+        .in("planner_transaction_id", ids);
+
+      if (result.error) {
+        console.error("Errore cancellazione batch link banca per planner_transaction_id", result.error);
+      }
+    }
+
+    for (const ids of chunkArray(externalTransactionIds, 500)) {
+      const result = await supabaseClient
+        .from("bank_transactions")
+        .delete()
+        .eq("user_id", supabaseSession.user.id)
+        .in("external_transaction_id", ids);
+
+      if (result.error) {
+        console.error("Errore cancellazione batch link banca per external_transaction_id", result.error);
+      }
+    }
+  } catch (error) {
+    console.error("Errore cancellazione batch collegamenti transazioni bancarie", error);
   }
 }
 
@@ -1633,6 +1694,10 @@ function syncTransactionCategoryOptions() {
   }
 }
 
+function resetMovementVisibleLimit() {
+  movementVisibleLimit = MOVEMENT_RENDER_BATCH_SIZE;
+}
+
 function getDefaultEntryDate(month) {
   const today = new Date();
   const isSameMonth = today.getFullYear() === month.year && today.getMonth() === month.id;
@@ -1966,46 +2031,55 @@ function bindForms() {
 
   els.movementFilterMode.addEventListener("change", (event) => {
     movementFilter.mode = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterStart.addEventListener("change", (event) => {
     movementFilter.start = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterEnd.addEventListener("change", (event) => {
     movementFilter.end = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterType.addEventListener("change", (event) => {
     movementFilter.type = event.target.value || "all";
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterCategory.addEventListener("change", (event) => {
     movementFilter.category = event.target.value || "all";
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterNote.addEventListener("input", (event) => {
     movementFilter.note = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterMinAmount.addEventListener("input", (event) => {
     movementFilter.minAmount = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementFilterMaxAmount.addEventListener("input", (event) => {
     movementFilter.maxAmount = event.target.value;
+    resetMovementVisibleLimit();
     render();
   });
 
   els.movementSortBy.addEventListener("change", (event) => {
     movementFilter.sortBy = event.target.value || "date-desc";
+    resetMovementVisibleLimit();
     render();
   });
 
@@ -2250,6 +2324,12 @@ function bindActions() {
 
     if (action === "bulk-update-filtered-category") {
       updateFilteredMovementCategories();
+      return;
+    }
+
+    if (action === "show-more-filtered-movements") {
+      movementVisibleLimit += MOVEMENT_RENDER_BATCH_SIZE;
+      render();
       return;
     }
 
@@ -4232,13 +4312,15 @@ function renderTransactions(month) {
 
 function renderAllMovements() {
   const all = getFilteredMovementEntries();
+  const visible = all.slice(0, movementVisibleLimit);
+  const hiddenCount = Math.max(0, all.length - visible.length);
 
   els.activeCategoryFilter.textContent = activeCategoryFilter
     ? `Filtro: ${activeCategoryFilter}`
     : "Filtro: tutte le categorie";
   setMovementBulkStatus(
     all.length
-      ? `${all.length} risultati filtrati. ${all.filter((item) => item.sourceKind === "transaction").length} modificabili come categoria.`
+      ? `${all.length} risultati filtrati, ${visible.length} visibili. ${all.filter((item) => item.sourceKind === "transaction").length} modificabili come categoria.`
       : "Nessun risultato filtrato.",
   );
 
@@ -4248,7 +4330,7 @@ function renderAllMovements() {
   }
 
   els.allMovementsList.innerHTML = `
-    ${all
+    ${visible
       .map((item) => {
         const month = state.months.find((monthEntry) => monthEntry.id === item.monthId && monthEntry.year === item.year);
         const baseCategories = item.sourceKind === "income"
@@ -4326,6 +4408,14 @@ function renderAllMovements() {
         `;
       })
       .join("")}
+    ${hiddenCount > 0
+      ? `
+        <article class="list-item movement-load-more">
+          <p class="list-meta">Altri ${hiddenCount} movimenti filtrati non renderizzati per mantenere fluida la pagina.</p>
+          <button class="secondary" type="button" data-action="show-more-filtered-movements">Mostra altri ${Math.min(MOVEMENT_RENDER_BATCH_SIZE, hiddenCount)}</button>
+        </article>
+      `
+      : ""}
   `;
 }
 
@@ -4374,21 +4464,21 @@ async function deleteFilteredMovements() {
     return;
   }
 
+  setMovementBulkStatus(`Eliminazione di ${filtered.length} movimenti in corso...`);
   const filteredIds = new Set(filtered.map((item) => item.id));
   const filteredTransactions = filtered
     .filter((item) => item.sourceKind === "transaction")
     .map((item) => findTransactionById(item.id))
     .filter(Boolean);
 
-  for (const transaction of filteredTransactions) {
-    await deleteRemoteBankTransactionLink(transaction);
-  }
+  await deleteRemoteBankTransactionLinks(filteredTransactions);
 
   state.months.forEach((month) => {
     month.transactions = (month.transactions || []).filter((item) => !filteredIds.has(item.id));
     month.incomes = (month.incomes || []).filter((item) => !filteredIds.has(item.id));
   });
 
+  resetMovementVisibleLimit();
   saveState();
   render();
   setMovementBulkStatus(`Eliminati ${filtered.length} movimenti filtrati.`, "positive");
@@ -4418,6 +4508,7 @@ function updateFilteredMovementCategories() {
     }
   });
 
+  resetMovementVisibleLimit();
   saveState();
   render();
   if (els.movementBulkCategory) {
@@ -4882,7 +4973,7 @@ function allMovementEntries() {
 function getCategorySuggestions() {
   const fromBudgets = state.months.flatMap((month) => month.categoryBudgets.map((item) => item.name));
   const fromTransactions = allTransactions().map((item) => item.category);
-  return [...new Set([...fromBudgets, ...fromTransactions].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  return [...new Set([...FIXED_CATEGORIES, ...fromBudgets, ...fromTransactions].filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
 function getAvailableYears() {
