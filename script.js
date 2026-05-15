@@ -2701,13 +2701,12 @@ function buildOdometerFrame(finalText, progress) {
 
 function renderKpis(stats) {
   const items = [
-    { label: "Saldo iniziale", value: money(stats.openingBalance), note: "apertura del primo mese utile" },
+    { label: "Saldo disponibile", value: money(stats.leftActual), note: `left budget ${money(stats.leftBudget)}` },
+    { label: "Disponibile libero", value: money(stats.freeToSpendActual), note: `accantonati ${money(stats.reservedPlannedRemaining)} - cassa reale ${money(stats.availableActual)}` },
     { label: "Rimanenze precedenti", value: money(stats.carryoverActual), note: `budget ${money(stats.carryoverBudget)}` },
     { label: "Entrate actual", value: money(stats.incomeActual), note: `budget ${money(stats.incomeBudget)}` },
-    { label: "Totale del mese", value: money(stats.monthTotalActual), note: `budget ${money(stats.monthTotalBudget)}` },
+    { label: "Entrate totali", value: money(stats.monthTotalActual), note: `budget ${money(stats.monthTotalBudget)}` },
     { label: "Uscite actual", value: money(stats.actualOut), note: `pianificate ${money(stats.plannedOut)}` },
-    { label: "Disponibile libero", value: money(stats.freeToSpendActual), note: `accantonati ${money(stats.reservedPlannedRemaining)} · cassa reale ${money(stats.availableActual)}` },
-    { label: "Left actual", value: money(stats.leftActual), note: `left budget ${money(stats.leftBudget)}` },
     { label: "Savings + debt", value: money(stats.savingsActual + stats.debtActual), note: "progressi su obiettivi" },
   ];
 
