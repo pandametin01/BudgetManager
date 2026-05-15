@@ -128,6 +128,7 @@ const els = {
   movementFilterEnd: document.getElementById("movementFilterEnd"),
   movementFilterType: document.getElementById("movementFilterType"),
   movementFilterCategory: document.getElementById("movementFilterCategory"),
+  movementFilterNote: document.getElementById("movementFilterNote"),
   movementFilterMinAmount: document.getElementById("movementFilterMinAmount"),
   movementFilterMaxAmount: document.getElementById("movementFilterMaxAmount"),
   movementSortBy: document.getElementById("movementSortBy"),
@@ -178,6 +179,7 @@ let movementFilter = {
   end: "",
   type: "all",
   category: "all",
+  note: "",
   minAmount: "",
   maxAmount: "",
   sortBy: "date-desc",
@@ -1577,6 +1579,7 @@ function populateForms() {
     .map((category) => `<option value="${escapeAttribute(category)}">${category === "all" ? "Tutte le categorie" : category}</option>`)
     .join("");
   els.movementFilterCategory.value = movementCategories.includes(movementFilter.category) ? movementFilter.category : "all";
+  els.movementFilterNote.value = movementFilter.note;
   els.movementFilterMinAmount.value = movementFilter.minAmount;
   els.movementFilterMaxAmount.value = movementFilter.maxAmount;
   els.movementSortBy.value = movementFilter.sortBy;
@@ -1980,6 +1983,11 @@ function bindForms() {
     render();
   });
 
+  els.movementFilterNote.addEventListener("input", (event) => {
+    movementFilter.note = event.target.value;
+    render();
+  });
+
   els.movementFilterMinAmount.addEventListener("input", (event) => {
     movementFilter.minAmount = event.target.value;
     render();
@@ -2183,7 +2191,7 @@ function bindActions() {
         state = buildAccountState(createDefaultState(), getCurrentUsername());
         activeCategoryFilter = "";
         clearChartZoom();
-        movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+        movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
         saveState();
         renderMonthOptions();
         populateForms();
@@ -2344,7 +2352,7 @@ async function applyAuthState() {
     hasPlayedDashboardSlotAnimation = false;
     activeCategoryFilter = "";
     clearChartZoom();
-    movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+    movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
     if (els.currentUsername) {
       els.currentUsername.textContent = "";
     }
@@ -2360,7 +2368,7 @@ async function applyAuthState() {
   state = await loadState();
   activeCategoryFilter = "";
   clearChartZoom();
-  movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", minAmount: "", maxAmount: "", sortBy: "date-desc" };
+  movementFilter = { mode: "selected-month", start: "", end: "", type: "all", category: "all", note: "", minAmount: "", maxAmount: "", sortBy: "date-desc" };
   if (els.currentUsername) {
     els.currentUsername.textContent = getCurrentUsername();
   }
@@ -4350,6 +4358,23 @@ function movementMatchesFilter(item) {
 
   if (movementFilter.category !== "all" && String(item.category || "").toLowerCase() !== String(movementFilter.category || "").toLowerCase()) {
     return false;
+  }
+
+  const noteFilter = lowerText(movementFilter.note).trim();
+  if (noteFilter) {
+    const searchableText = lowerText([
+      item.note,
+      item.category,
+      item.creditorName,
+      item.debtorName,
+      item.bankEntryReference,
+      item.bankTransactionId,
+      item.bankExternalId,
+      item.bankDirection,
+    ].filter(Boolean).join(" "));
+    if (!searchableText.includes(noteFilter)) {
+      return false;
+    }
   }
 
   const amount = Number(item.amount || 0);
