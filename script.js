@@ -3807,7 +3807,9 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
   visibleDots.forEach((dot, index) => {
     const x = xForPosition(dot.timePosition);
     const y = yForPosition(dot.timePosition);
-    const groupKey = dot.time ? `timed-${index}` : `untimed-day-${dot.day}`;
+    const groupKey = chartView === "day"
+      ? (dot.time ? `timed-${dot.day}-${dot.timePosition.toFixed(5)}` : `untimed-day-${dot.day}`)
+      : `day-${dot.day}`;
     const existing = groups.get(groupKey);
 
     if (existing) {
@@ -3833,7 +3835,7 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
         `;
       }
 
-      const anchorX = xForPosition(group.day + 0.5);
+      const anchorX = group.dots.reduce((acc, dot) => acc + dot.x, 0) / group.dots.length;
       const anchorY = group.dots.reduce((acc, dot) => acc + dot.y, 0) / group.dots.length;
       const radius = 18;
       const childrenMarkup = group.dots
@@ -3851,9 +3853,13 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
         })
         .join("");
 
+      const clusterTitle = chartView === "day"
+        ? `${group.dots.length} movimenti sovrapposti nello stesso momento`
+        : `${group.dots.length} movimenti nello stesso giorno`;
+
       return `
         <g class="chart-dot-cluster" tabindex="0" transform="translate(${anchorX} ${anchorY})">
-          <title>${escapeAttribute(`${group.dots.length} movimenti senza ora nello stesso giorno`)}</title>
+          <title>${escapeAttribute(clusterTitle)}</title>
           <circle class="cluster-core" r="7"></circle>
           <text class="cluster-count" x="0" y="1">${group.dots.length}</text>
           ${childrenMarkup}
