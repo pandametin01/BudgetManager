@@ -1605,8 +1605,10 @@ function populateForms() {
     els.profileForm.elements.namedItem("year").value = state.profile.year;
     els.profileForm.elements.namedItem("startBalance").value = state.profile.startBalance;
   }
-  els.incomeForm.elements.namedItem("date").value = getDefaultEntryDate(getSelectedMonth());
-  els.incomeForm.elements.namedItem("time").value = "";
+  if (els.incomeForm) {
+    els.incomeForm.elements.namedItem("date").value = getDefaultEntryDate(getSelectedMonth());
+    els.incomeForm.elements.namedItem("time").value = "";
+  }
   els.transactionForm.elements.namedItem("date").value = new Date().toISOString().slice(0, 10);
   syncTransactionCategoryOptions();
   const availableYears = getAvailableYears();
@@ -2155,7 +2157,7 @@ function bindForms() {
     event.target.value = "";
   });
 
-  els.incomeForm.addEventListener("submit", (event) => {
+  els.incomeForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     getSelectedMonth().incomes.unshift({
@@ -2173,7 +2175,7 @@ function bindForms() {
     render();
   });
 
-  els.billForm.addEventListener("submit", (event) => {
+  els.billForm?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     getSelectedMonth().bills.unshift({
@@ -2626,8 +2628,6 @@ function render() {
   renderSectionSafely("snapshot laterale", els.sidebarSnapshot, () => renderSidebar(annualStats));
   renderSectionSafely("panoramica annuale", els.annualCards, () => renderAnnualCards(annualStats));
   renderSectionSafely("grafici", els.budgetCharts, () => renderBudgetCharts(selectedMonth, stats));
-  renderSectionSafely("entrate del mese", els.incomeList, () => renderIncomeList(selectedMonth, stats));
-  renderSectionSafely("bills del mese", els.billList, () => renderBillList(selectedMonth));
   renderSectionSafely("categorie del mese", els.categoryList, () => renderCategoryList(selectedMonth, stats));
   renderSectionSafely("movimenti recenti", els.transactionList, () => renderTransactions(selectedMonth));
   renderSectionSafely("archivio movimenti", els.allMovementsList, () => renderAllMovements());

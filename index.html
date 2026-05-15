@@ -191,58 +191,12 @@
           <div class="panel-header">
             <div>
               <p class="eyebrow">Impostazioni e budget</p>
-              <h3>Configura profilo e mese selezionato</h3>
+              <h3>Categorie e budget del mese</h3>
             </div>
             <button class="primary" data-action="jump-category-form">Aggiungi categoria</button>
           </div>
 
-          <div class="form-grid settings-grid">
-            <form id="incomeForm" class="card-form">
-              <h4>Aggiungi entrata budget</h4>
-              <label>
-                Voce
-                <input name="name" type="text" placeholder="Stipendio" required />
-              </label>
-              <label>
-                Budget
-                <input name="budget" type="number" step="0.01" required />
-              </label>
-              <label>
-                Actual
-                <input name="actual" type="number" step="0.01" />
-              </label>
-              <label>
-                Data entrata
-                <input name="date" type="date" required />
-              </label>
-              <label>
-                Ora entrata
-                <input name="time" type="time" />
-              </label>
-              <button class="primary" type="submit">Aggiungi entrata</button>
-            </form>
-
-            <form id="billForm" class="card-form">
-              <h4>Aggiungi bolletta ricorrente</h4>
-              <label>
-                Nome
-                <input name="name" type="text" placeholder="Netflix" required />
-              </label>
-              <label>
-                Scadenza
-                <input name="dueDay" type="number" min="1" max="31" required />
-              </label>
-              <label>
-                Budget
-                <input name="budget" type="number" step="0.01" required />
-              </label>
-              <label>
-                Actual
-                <input name="actual" type="number" step="0.01" />
-              </label>
-              <button class="primary" type="submit">Aggiungi bill</button>
-            </form>
-
+          <div class="dual-columns planner-columns">
             <form id="categoryForm" class="card-form category-form-card">
               <h4>Nuova categoria spese</h4>
               <p class="form-helper">Crea una categoria nuova che poi puoi usare anche nei movimenti.</p>
@@ -260,23 +214,13 @@
               </label>
               <button class="primary" type="submit">Aggiungi categoria</button>
             </form>
-          </div>
-
-          <div class="dual-columns planner-columns">
-            <div class="data-card">
-              <div class="card-title-row">
-                <h4>Entrate del mese</h4>
-                <span id="incomeCount" class="tag"></span>
-              </div>
-              <div id="incomeList" class="list-stack"></div>
-            </div>
 
             <div class="data-card">
               <div class="card-title-row">
-                <h4>Bills del mese</h4>
-                <span id="billCount" class="tag"></span>
+                <h4>Categorie del mese</h4>
+                <span id="categoryCount" class="tag"></span>
               </div>
-              <div id="billList" class="list-stack"></div>
+              <div id="categoryList" class="list-stack"></div>
             </div>
           </div>
         </section>
@@ -327,14 +271,6 @@
                 <button class="primary" type="submit">Registra movimento</button>
               </div>
             </form>
-
-            <div class="data-card">
-              <div class="card-title-row">
-                <h4>Categorie del mese</h4>
-                <span id="categoryCount" class="tag"></span>
-              </div>
-              <div id="categoryList" class="list-stack"></div>
-            </div>
 
             <div class="data-card">
               <div class="card-title-row">
