@@ -132,6 +132,8 @@ const els = {
   movementFilterMinAmount: document.getElementById("movementFilterMinAmount"),
   movementFilterMaxAmount: document.getElementById("movementFilterMaxAmount"),
   movementSortBy: document.getElementById("movementSortBy"),
+  movementBulkCategory: document.getElementById("movementBulkCategory"),
+  movementBulkStatus: document.getElementById("movementBulkStatus"),
   csvImportInput: document.getElementById("csvImportInput"),
   csvImportStatus: document.getElementById("csvImportStatus"),
   sidebarSnapshot: document.getElementById("sidebarSnapshot"),
@@ -1583,6 +1585,10 @@ function populateForms() {
   els.movementFilterMinAmount.value = movementFilter.minAmount;
   els.movementFilterMaxAmount.value = movementFilter.maxAmount;
   els.movementSortBy.value = movementFilter.sortBy;
+  els.movementBulkCategory.innerHTML = [
+    '<option value="">Seleziona categoria</option>',
+    ...getCategorySuggestions().map((category) => `<option value="${escapeAttribute(category)}">${category}</option>`),
+  ].join("");
 }
 
 function getTransactionCategoryOptions(type) {
@@ -2234,6 +2240,16 @@ function bindActions() {
 
     if (action === "push-supabase") {
       pushCurrentStateToSupabase();
+      return;
+    }
+
+    if (action === "bulk-delete-filtered-movements") {
+      await deleteFilteredMovements();
+      return;
+    }
+
+    if (action === "bulk-update-filtered-category") {
+      updateFilteredMovementCategories();
       return;
     }
 
@@ -4215,13 +4231,16 @@ function renderTransactions(month) {
 }
 
 function renderAllMovements() {
-  const all = allMovementEntries()
-    .filter((item) => movementMatchesFilter(item))
-    .sort(compareMovements);
+  const all = getFilteredMovementEntries();
 
   els.activeCategoryFilter.textContent = activeCategoryFilter
     ? `Filtro: ${activeCategoryFilter}`
     : "Filtro: tutte le categorie";
+  setMovementBulkStatus(
+    all.length
+      ? `${all.length} risultati filtrati. ${all.filter((item) => item.sourceKind === "transaction").length} modificabili come categoria.`
+      : "Nessun risultato filtrato.",
+  );
 
   if (!all.length) {
     els.allMovementsList.innerHTML = emptyStateTemplate.innerHTML;
@@ -4308,6 +4327,103 @@ function renderAllMovements() {
       })
       .join("")}
   `;
+}
+
+function getFilteredMovementEntries() {
+  return allMovementEntries()
+    .filter((item) => movementMatchesFilter(item))
+    .sort(compareMovements);
+}
+
+function setMovementBulkStatus(message, tone = "") {
+  if (!els.movementBulkStatus) {
+    return;
+  }
+  els.movementBulkStatus.textContent = message || "";
+  els.movementBulkStatus.className = tone ? `list-meta ${tone}` : "list-meta";
+}
+
+function ensureCategoryForMovement(month, categoryName) {
+  if (!month || !categoryName) {
+    return;
+  }
+
+  const exists = (month.categoryBudgets || []).some((entry) => lowerText(entry.name) === lowerText(categoryName));
+  if (exists) {
+    return;
+  }
+
+  month.categoryBudgets = month.categoryBudgets || [];
+  month.categoryBudgets.unshift({
+    id: crypto.randomUUID(),
+    name: categoryName,
+    budget: 0,
+    isUndefinedBudget: true,
+  });
+}
+
+async function deleteFilteredMovements() {
+  const filtered = getFilteredMovementEntries();
+  if (!filtered.length) {
+    setMovementBulkStatus("Nessun movimento filtrato da eliminare.", "negative");
+    return;
+  }
+
+  const confirmed = window.confirm(`Confermi l'eliminazione di ${filtered.length} movimenti filtrati? L'azione non si puo annullare.`);
+  if (!confirmed) {
+    return;
+  }
+
+  const filteredIds = new Set(filtered.map((item) => item.id));
+  const filteredTransactions = filtered
+    .filter((item) => item.sourceKind === "transaction")
+    .map((item) => findTransactionById(item.id))
+    .filter(Boolean);
+
+  for (const transaction of filteredTransactions) {
+    await deleteRemoteBankTransactionLink(transaction);
+  }
+
+  state.months.forEach((month) => {
+    month.transactions = (month.transactions || []).filter((item) => !filteredIds.has(item.id));
+    month.incomes = (month.incomes || []).filter((item) => !filteredIds.has(item.id));
+  });
+
+  saveState();
+  render();
+  setMovementBulkStatus(`Eliminati ${filtered.length} movimenti filtrati.`, "positive");
+}
+
+function updateFilteredMovementCategories() {
+  const categoryName = String(els.movementBulkCategory?.value || "").trim();
+  if (!categoryName) {
+    setMovementBulkStatus("Seleziona una categoria da applicare ai risultati filtrati.", "negative");
+    return;
+  }
+
+  const filteredTransactions = getFilteredMovementEntries()
+    .filter((item) => item.sourceKind === "transaction")
+    .map((item) => findTransactionContextById(item.id))
+    .filter(Boolean);
+
+  if (!filteredTransactions.length) {
+    setMovementBulkStatus("Nessun movimento filtrato modificabile come categoria.", "negative");
+    return;
+  }
+
+  filteredTransactions.forEach(({ month, transaction }) => {
+    transaction.category = categoryName;
+    if (transaction.type === "expense") {
+      ensureCategoryForMovement(month, categoryName);
+    }
+  });
+
+  saveState();
+  render();
+  if (els.movementBulkCategory) {
+    els.movementBulkCategory.value = categoryName;
+  }
+  setMovementBulkStatus(`Categoria aggiornata per ${filteredTransactions.length} movimenti filtrati.`, "positive");
 }
 
 function renderMovementBankMeta(item) {

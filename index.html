@@ -420,6 +420,17 @@
               </select>
             </label>
           </div>
+          <div class="archive-bulk-actions">
+            <label>
+              Nuova categoria risultati
+              <select id="movementBulkCategory">
+                <option value="">Seleziona categoria</option>
+              </select>
+            </label>
+            <button class="secondary" type="button" data-action="bulk-update-filtered-category">Modifica categoria filtrati</button>
+            <button class="secondary negative-button" type="button" data-action="bulk-delete-filtered-movements">Elimina filtrati</button>
+            <span id="movementBulkStatus" class="list-meta"></span>
+          </div>
           <div id="allMovementsList" class="movements-table"></div>
           </div>
         </section>
