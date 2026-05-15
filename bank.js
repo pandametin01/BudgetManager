@@ -1074,6 +1074,29 @@ function normalizeTransactionLabel(transaction) {
   );
 }
 
+function getTransactionCreditorName(transaction) {
+  return firstUsefulTransactionText(
+    transaction?.creditor?.name,
+    transaction?.creditor_name,
+    transaction?.ultimate_creditor,
+  );
+}
+
+function getTransactionDebtorName(transaction) {
+  return firstUsefulTransactionText(
+    transaction?.debtor?.name,
+    transaction?.debtor_name,
+    transaction?.ultimate_debtor,
+  );
+}
+
+function getDefaultBankImportNote(transaction, type, fallbackLabel) {
+  if (type === "expense") {
+    return firstUsefulTransactionText(getTransactionCreditorName(transaction), fallbackLabel) || "Movimento bancario";
+  }
+  return firstUsefulTransactionText(fallbackLabel, getTransactionDebtorName(transaction)) || "Movimento bancario";
+}
+
 function createBankExternalTransactionId(accountUid, transaction) {
   return (
     transaction?.entry_reference ||
@@ -1349,8 +1372,11 @@ async function loadMissingBankTransactionsPreview() {
       .map((transaction) => {
         const amountInfo = normalizeTransactionAmount(transaction);
         const { date: datePart, time: timePart } = extractTransactionDateParts(transaction);
-        const note = normalizeTransactionLabel(transaction);
+        const label = normalizeTransactionLabel(transaction);
         const type = amountInfo.amount >= 0 ? "income" : "expense";
+        const note = getDefaultBankImportNote(transaction, type, label);
+        const creditorName = getTransactionCreditorName(transaction);
+        const debtorName = getTransactionDebtorName(transaction);
         const category = type === "income" ? "Entrate" : suggestCategoryFromTransaction(transaction, note, plannerCategories);
         const normalizedAmount = Number(Math.abs(amountInfo.amount).toFixed(2));
         const hasEntryReference = Boolean(String(transaction?.entry_reference || "").trim());
@@ -1359,7 +1385,7 @@ async function loadMissingBankTransactionsPreview() {
           include: true,
           accountUid,
           externalTransactionId: createBankExternalTransactionId(accountUid, transaction),
-          bankLabel: note,
+          bankLabel: label,
           accountLabel: describeBankAccount(
             (linkedBankSession.accounts || []).find((account) => account.uid === accountUid) || {},
             0,
@@ -1371,8 +1397,8 @@ async function loadMissingBankTransactionsPreview() {
           amount: normalizedAmount,
           note,
           currency: amountInfo.currency,
-          creditorName: transaction?.creditor?.name || transaction?.creditor_name || "",
-          debtorName: transaction?.debtor?.name || transaction?.debtor_name || "",
+          creditorName,
+          debtorName,
           entryReference: transaction?.entry_reference || "",
           transactionId: transaction?.transaction_id || "",
           directionLabel: String(transaction?.credit_debit_indicator || "").toUpperCase() === "CRDT" ? "Credito" : String(transaction?.credit_debit_indicator || "").toUpperCase() === "DBIT" ? "Debito" : "N/D",
