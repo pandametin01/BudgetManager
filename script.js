@@ -2786,30 +2786,29 @@ function renderRunwayStats(stats) {
   const endDate = new Date(`${endDateValue}T23:59:59`);
   const today = new Date();
   const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayValue = toDateInputValue(startDate);
-  const diffMs = endDate.getTime() - startDate.getTime();
-  const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
-  const weekendDays = countWeekendDays(startDate, endDate);
-  const weekendWindows = countWeekendWindows(startDate, endDate);
   const noSpendDays = Math.max(0, Number(runwayNoSpendDaysValue || 0));
-  const adjustedSpendDays = Math.max(0, totalDays - noSpendDays);
-  const adjustedWeekendDays = Math.max(0, weekendDays - noSpendDays);
-  const adjustedWeekendWindows = Math.max(0, weekendWindows - noSpendDays);
-  const dailySpend = adjustedSpendDays > 0 ? available / adjustedSpendDays : 0;
-  const weekendSpend = adjustedWeekendDays > 0 ? available / adjustedWeekendDays : 0;
-  const weekendBudget = adjustedWeekendWindows > 0 ? available / adjustedWeekendWindows : 0;
+  const projectedStartDate = new Date(startDate);
+  projectedStartDate.setDate(projectedStartDate.getDate() + noSpendDays);
+  const projectedTodayValue = toDateInputValue(projectedStartDate);
+  const diffMs = endDate.getTime() - projectedStartDate.getTime();
+  const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
+  const weekendDays = countWeekendDays(projectedStartDate, endDate);
+  const weekendWindows = countWeekendWindows(projectedStartDate, endDate);
+  const dailySpend = totalDays > 0 ? available / totalDays : 0;
+  const weekendSpend = weekendDays > 0 ? available / weekendDays : 0;
+  const weekendBudget = weekendWindows > 0 ? available / weekendWindows : 0;
   const configuredDailyBudget = Number(runwayDailyBudgetValue);
   const hasConfiguredDailyBudget = runwayDailyBudgetValue !== "" && !Number.isNaN(configuredDailyBudget) && configuredDailyBudget > 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
   const todaySpent = allMovementEntries()
-    .filter((item) => item.type === "expense" && item.date === todayValue)
+    .filter((item) => item.type === "expense" && item.date === projectedTodayValue)
     .reduce((total, item) => total + Number(item.amount || 0), 0);
   const todayRemaining = Math.max(0, effectiveDailyBudget - todaySpent);
   const todayOverspend = Math.max(0, todaySpent - effectiveDailyBudget);
   const recoveryDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
   const recoveryTomorrowBudget = Math.max(0, effectiveDailyBudget - todayOverspend);
-  const relevantWeekend = getRelevantWeekendRange(startDate, endDate, startDate);
-  const todayDay = startDate.getDay();
+  const relevantWeekend = getRelevantWeekendRange(projectedStartDate, endDate, projectedStartDate);
+  const todayDay = projectedStartDate.getDay();
   const isTodayWeekend = todayDay === 5 || todayDay === 6 || todayDay === 0;
   const weekendSpentCurrent = relevantWeekend
     ? allMovementEntries()
@@ -2855,7 +2854,7 @@ function renderRunwayStats(stats) {
       label: "Budget massimo al giorno",
       value: totalDays > 0 ? money(dailySpend) : "--",
       note: totalDays > 0
-        ? `${adjustedSpendDays} giorni spendibili fino al termine${noSpendDays > 0 ? ` · ${noSpendDays} giorni a spesa zero` : ""}`
+        ? `${totalDays} giorni dalla data proiettata${noSpendDays > 0 ? ` · proiezione avanti di ${noSpendDays} giorni` : ""}`
         : "scegli una data finale valida",
     },
     {
@@ -2868,7 +2867,9 @@ function renderRunwayStats(stats) {
     {
       label: "Puoi spendere oggi",
       value: totalDays > 0 ? money(todayRemaining) : "--",
-      note: `spesi oggi ${money(todaySpent)} sul limite giornaliero`,
+      note: noSpendDays > 0
+        ? `nella data proiettata (${formatDate(projectedTodayValue)}) risultano spesi ${money(todaySpent)}`
+        : `spesi oggi ${money(todaySpent)} sul limite giornaliero`,
     },
     {
       label: "Recupero sforamento",
