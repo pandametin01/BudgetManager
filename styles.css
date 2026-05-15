@@ -605,7 +605,7 @@ input {
 }
 
 .ledger-grid {
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
@@ -1572,6 +1572,7 @@ input {
 
 .planner-columns {
   margin-top: 18px;
+  grid-template-columns: minmax(260px, 3fr) minmax(0, 7fr);
 }
 
 .empty-state {
@@ -1613,6 +1614,10 @@ input {
   .goals-grid,
   .dual-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planner-columns {
+    grid-template-columns: minmax(260px, 3fr) minmax(0, 7fr);
   }
 
   .chart-stats {
