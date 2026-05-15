@@ -83,17 +83,67 @@ function cloneData(value) {
 function normalizePlannerState(parsed) {
   const base = createDefaultState();
   const source = parsed && typeof parsed === "object" ? parsed : {};
+  const normalizedProfile = { ...base.profile, ...(source.profile || {}) };
+  const fallbackYear = Number(normalizedProfile.year) || base.profile.year;
+  const monthMap = new Map();
+
+  MONTHS.forEach((_, index) => {
+    const fallbackMonth = createDefaultMonth(index, fallbackYear);
+    monthMap.set(`${fallbackMonth.year}-${fallbackMonth.id}`, fallbackMonth);
+  });
+
+  if (Array.isArray(source.months)) {
+    source.months.forEach((sourceMonth, index) => {
+      if (!sourceMonth || typeof sourceMonth !== "object") {
+        return;
+      }
+
+      const sourceId = Number(sourceMonth.id);
+      const monthId = Number.isInteger(sourceId) && sourceId >= 0 && sourceId < MONTHS.length
+        ? sourceId
+        : index % MONTHS.length;
+      const sourceYear = Number(sourceMonth.year);
+      const year = Number.isInteger(sourceYear) && sourceYear > 0
+        ? sourceYear
+        : fallbackYear + Math.floor(index / MONTHS.length);
+      const fallbackMonth = createDefaultMonth(monthId, year);
+      const normalizedMonth = {
+        ...fallbackMonth,
+        ...sourceMonth,
+        id: monthId,
+        year,
+        name: sourceMonth.name || fallbackMonth.name,
+        incomes: Array.isArray(sourceMonth.incomes) ? sourceMonth.incomes : fallbackMonth.incomes,
+        bills: Array.isArray(sourceMonth.bills) ? sourceMonth.bills : fallbackMonth.bills,
+        categoryBudgets: Array.isArray(sourceMonth.categoryBudgets) ? sourceMonth.categoryBudgets : fallbackMonth.categoryBudgets,
+        transactions: Array.isArray(sourceMonth.transactions) ? sourceMonth.transactions : fallbackMonth.transactions,
+      };
+      monthMap.set(`${normalizedMonth.year}-${normalizedMonth.id}`, normalizedMonth);
+    });
+  }
+
+  const normalizedMonths = [...monthMap.values()].sort((left, right) => {
+    if (left.year !== right.year) {
+      return left.year - right.year;
+    }
+    return left.id - right.id;
+  });
+
+  const selectedMonthNumber = Number(normalizedProfile.selectedMonth);
+  normalizedProfile.selectedMonth = Number.isInteger(selectedMonthNumber)
+    && selectedMonthNumber >= 0
+    && selectedMonthNumber < normalizedMonths.length
+    ? selectedMonthNumber
+    : Math.min(base.profile.selectedMonth, normalizedMonths.length - 1);
+
   return {
     ...base,
     ...source,
-    profile: { ...base.profile, ...(source.profile || {}) },
-    months: MONTHS.map((_, index) => ({
-      ...createDefaultMonth(index, source.profile?.year || base.profile.year),
-      ...(source.months?.[index] || {}),
-    })),
-    investments: source.investments || base.investments,
-    savingsGoals: source.savingsGoals || [],
-    debtGoals: source.debtGoals || [],
+    profile: normalizedProfile,
+    months: normalizedMonths,
+    investments: Array.isArray(source.investments) ? source.investments : base.investments,
+    savingsGoals: Array.isArray(source.savingsGoals) ? source.savingsGoals : [],
+    debtGoals: Array.isArray(source.debtGoals) ? source.debtGoals : [],
   };
 }
 
