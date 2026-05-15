@@ -3798,9 +3798,10 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
   visibleDots.forEach((dot, index) => {
     const x = xForPosition(dot.timePosition);
     const y = yForPosition(dot.timePosition);
-    const groupKey = chartView === "day"
-      ? (dot.time ? `timed-${dot.day}-${dot.timePosition.toFixed(5)}` : `untimed-day-${dot.day}`)
-      : `day-${dot.day}`;
+    const normalizedTime = String(dot.time || "").trim().slice(0, 5);
+    const groupKey = normalizedTime
+      ? `timed-${dot.day}-${normalizedTime}`
+      : `untimed-day-${dot.day}`;
     const existing = groups.get(groupKey);
 
     if (existing) {
@@ -3811,6 +3812,7 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
     groups.set(groupKey, {
       key: groupKey,
       day: dot.day,
+      hasTime: Boolean(normalizedTime),
       dots: [{ ...dot, x, y }],
     });
   });
@@ -3844,9 +3846,9 @@ function renderMovementDotGroups(visibleDots, xForPosition, yForPosition) {
         })
         .join("");
 
-      const clusterTitle = chartView === "day"
-        ? `${group.dots.length} movimenti sovrapposti nello stesso momento`
-        : `${group.dots.length} movimenti nello stesso giorno`;
+      const clusterTitle = group.hasTime
+        ? `${group.dots.length} movimenti con lo stesso orario`
+        : `${group.dots.length} movimenti senza ora nello stesso giorno`;
 
       return `
         <g class="chart-dot-cluster" tabindex="0" transform="translate(${anchorX} ${anchorY})">
