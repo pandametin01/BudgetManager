@@ -140,6 +140,7 @@ const els = {
   movementFilterMinAmount: document.getElementById("movementFilterMinAmount"),
   movementFilterMaxAmount: document.getElementById("movementFilterMaxAmount"),
   movementSortBy: document.getElementById("movementSortBy"),
+  movementFilterTotal: document.getElementById("movementFilterTotal"),
   movementBulkCategory: document.getElementById("movementBulkCategory"),
   movementBulkStatus: document.getElementById("movementBulkStatus"),
   csvImportInput: document.getElementById("csvImportInput"),
@@ -4359,10 +4360,22 @@ function renderAllMovements() {
   const all = getFilteredMovementEntries();
   const visible = all.slice(0, movementVisibleLimit);
   const hiddenCount = Math.max(0, all.length - visible.length);
+  const totalIncome = all
+    .filter((item) => item.type === "income")
+    .reduce((acc, item) => acc + Number(item.amount || 0), 0);
+  const totalOut = all
+    .filter((item) => item.type !== "income")
+    .reduce((acc, item) => acc + Number(item.amount || 0), 0);
+  const totalNet = totalIncome - totalOut;
 
   els.activeCategoryFilter.textContent = activeCategoryFilter
     ? `Filtro: ${activeCategoryFilter}`
     : "Filtro: tutte le categorie";
+  if (els.movementFilterTotal) {
+    els.movementFilterTotal.textContent = all.length
+      ? `Totale filtrato: ${money(totalNet)} · Entrate ${money(totalIncome)} · Uscite ${money(totalOut)}`
+      : "Totale filtrato: 0 €";
+  }
   setMovementBulkStatus(
     all.length
       ? `${all.length} risultati filtrati, ${visible.length} visibili. ${all.filter((item) => item.sourceKind === "transaction").length} modificabili come categoria.`

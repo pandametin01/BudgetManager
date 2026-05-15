@@ -482,6 +482,12 @@ button:hover {
   margin-top: 18px;
 }
 
+.archive-summary {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
 .csv-import-status {
   margin: 12px 0 0;
 }
