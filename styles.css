@@ -89,6 +89,22 @@ body.auth-screen .login-screen {
   color: var(--green);
 }
 
+.runway-inline-gain,
+.runway-inline-gain-percent {
+  color: var(--green);
+}
+
+.runway-inline-gain {
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.runway-inline-gain-percent {
+  font-size: 0.8em;
+  opacity: 0.9;
+}
+
 .auth-note {
   padding: 10px 12px;
   border-radius: 16px;

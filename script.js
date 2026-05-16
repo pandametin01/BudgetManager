@@ -2819,6 +2819,12 @@ function renderKpis(stats) {
 }
 
 function renderRunwayStats(stats) {
+  const formatInlineGain = (gainValue, gainPercent) => {
+    if (!(gainValue > 0)) {
+      return "";
+    }
+    return `<span class="runway-inline-gain"> - ${money(gainValue)} <span class="runway-inline-gain-percent">(+${gainPercent.toFixed(0)}%)</span></span>`;
+  };
   const available = Math.max(0, Number(stats.freeToSpendActual || 0));
   const endDateValue = getResolvedRunwayEndDate();
   const endDate = new Date(`${endDateValue}T23:59:59`);
@@ -2920,10 +2926,12 @@ function renderRunwayStats(stats) {
     },
     {
       label: "Limite giornaliero attivo",
-      value: totalDays > 0 ? money(effectiveDailyBudget) : "--",
+      valueHtml: totalDays > 0
+        ? `${money(effectiveDailyBudget)}${formatInlineGain(gainedDaily, tomorrowBonusPercent)}`
+        : "--",
       note: hasConfiguredDailyBudget
-        ? `fissato ${money(configuredDailyBudget)} - sostenibile max ${money(dailySpend)}`
-        : "automatico dal disponibile libero",
+        ? `fissato ${money(configuredDailyBudget)} - sostenibile max ${money(dailySpend)}${gainedDaily > 0 ? ` · guadagno contato dal ${formatDate(periodStartValue)}` : ""}`
+        : `automatico dal disponibile libero${gainedDaily > 0 ? ` · guadagno contato dal ${formatDate(periodStartValue)}` : ""}`,
     },
     {
       label: "Puoi spendere oggi",
@@ -2939,37 +2947,17 @@ function renderRunwayStats(stats) {
     },
     {
       label: "Budget singolo giorno weekend",
-      value: weekendDays > 0 ? money(weekendSpend) : "--",
+      valueHtml: weekendDays > 0
+        ? `${money(weekendSpend)}${formatInlineGain(gainedWeekendDay, nextWeekendDayBonusPercent)}`
+        : "--",
       note: weekendDayNote,
     },
     {
       label: "Budget del fine settimana",
-      value: weekendWindows > 0 ? money(weekendBudget) : "--",
+      valueHtml: weekendWindows > 0
+        ? `${money(weekendBudget)}${formatInlineGain(gainedWeekend, nextWeekendBonusPercent)}`
+        : "--",
       note: weekendNote,
-    },
-    {
-      label: "Guadagnato oggi",
-      value: gainedDaily > 0 ? money(gainedDaily) : "--",
-      valueClass: gainedDaily > 0 ? "positive" : "",
-      note: gainedDaily > 0
-        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedDaily)} rispetto al budget iniziale di ${money(baseEffectiveDailyBudget)} · +${tomorrowBonusPercent.toFixed(0)}%`
-        : `nessun guadagno rispetto al budget iniziale contato dal ${formatDate(periodStartValue)}`,
-    },
-    {
-      label: "Guadagnato sul giorno weekend",
-      value: gainedWeekendDay > 0 ? money(gainedWeekendDay) : "--",
-      valueClass: gainedWeekendDay > 0 ? "positive" : "",
-      note: gainedWeekendDay > 0
-        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedWeekendDay)} rispetto al budget iniziale di ${money(baseWeekendSpend)} · +${nextWeekendDayBonusPercent.toFixed(0)}%`
-        : `nessun guadagno rispetto al budget iniziale del giorno weekend contato dal ${formatDate(periodStartValue)}`,
-    },
-    {
-      label: "Guadagnato sul fine settimana",
-      value: gainedWeekend > 0 ? money(gainedWeekend) : "--",
-      valueClass: gainedWeekend > 0 ? "positive" : "",
-      note: gainedWeekend > 0
-        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedWeekend)} rispetto al budget iniziale di ${money(baseWeekendBudget)} · +${nextWeekendBonusPercent.toFixed(0)}%`
-        : `nessun guadagno rispetto al budget iniziale del fine settimana contato dal ${formatDate(periodStartValue)}`,
     },
   ];
 
@@ -2978,7 +2966,7 @@ function renderRunwayStats(stats) {
       (item) => `
         <article class="kpi-card">
           <p class="eyebrow">${item.label}</p>
-          <strong class="${item.valueClass || ""}">${item.value}</strong>
+          <strong class="${item.valueClass || ""}">${item.valueHtml ?? item.value}</strong>
           <p class="list-meta">${item.note}</p>
         </article>
       `,
