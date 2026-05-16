@@ -2893,6 +2893,7 @@ function renderRunwayStats(stats) {
   const spentBeforeToday = expenseTotalBetween(periodStartValue, projectedTodayValue);
   const plannedAllowanceBeforeToday = plannedAllowanceBefore(projectedStartDate);
   const netCarryoverBeforeToday = plannedAllowanceBeforeToday - spentBeforeToday;
+  const dailySpreadBudget = totalDays > 0 ? available / totalDays : 0;
   const dailySpend = totalDays > 0 ? Math.max(0, baseDailySpend + (netCarryoverBeforeToday / totalDays)) : 0;
   const weekendAnchorDate = relevantWeekend ? new Date(`${relevantWeekend.start}T00:00:00`) : null;
   const weekendAnchorEndDate = relevantWeekend ? new Date(`${relevantWeekend.end}T23:59:59`) : null;
@@ -2951,9 +2952,9 @@ function renderRunwayStats(stats) {
     },
     {
       label: "Budget massimo al giorno",
-      value: totalDays > 0 ? money(dailySpend) : "--",
+      value: totalDays > 0 ? money(dailySpreadBudget) : "--",
       note: totalDays > 0
-        ? `${totalDays} giorni dalla data proiettata${noSpendDays > 0 ? ` · proiezione avanti di ${noSpendDays} giorni` : ""}`
+        ? `${totalDays} giorni dalla data proiettata${noSpendDays > 0 ? ` · proiezione avanti di ${noSpendDays} giorni` : ""} · spalmato sui soldi disponibili ora`
         : "scegli una data finale valida",
     },
     {
