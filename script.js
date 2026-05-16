@@ -2909,7 +2909,7 @@ function renderRunwayStats(stats) {
   const netCarryoverBeforeToday = plannedAllowanceBeforeToday - spentBeforeToday;
   const scenarioAvailable = available - speculativeSpendTotal;
   const dailySpreadBudget = totalDays > 0 ? scenarioAvailable / totalDays : 0;
-  const dailySpend = totalDays > 0 ? (baseDailySpend + (netCarryoverBeforeToday / totalDays) - (speculativeSpendCurrent / totalDays)) : 0;
+  const dailySpend = totalDays > 0 ? (dailySpreadBudget + (netCarryoverBeforeToday / totalDays)) : 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
   const effectiveTodaySpentAgainstBudget = todaySpent + speculativeSpendCurrent;
   const todayBalance = effectiveDailyBudget - effectiveTodaySpentAgainstBudget;
