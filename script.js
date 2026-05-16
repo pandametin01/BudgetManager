@@ -2796,17 +2796,26 @@ function renderRunwayStats(stats) {
   const endDate = new Date(`${endDateValue}T23:59:59`);
   const today = new Date();
   const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const selectedMonth = getSelectedMonth();
+  const periodStartDate = selectedMonth
+    ? new Date(Number(selectedMonth.year), Number(selectedMonth.id), 1)
+    : new Date(startDate);
+  const periodStartValue = toDateInputValue(periodStartDate);
   const noSpendDays = Math.max(0, Number(runwayNoSpendDaysValue || 0));
-  const baseDiffMs = endDate.getTime() - startDate.getTime();
-  const baseTotalDays = baseDiffMs >= 0 ? Math.floor(baseDiffMs / 86400000) + 1 : 0;
-  const baseWeekendDays = countWeekendDays(startDate, endDate, runwayIncludeFridayValue);
-  const baseWeekendWindows = countWeekendWindows(startDate, endDate, runwayIncludeFridayValue);
-  const baseDailySpend = baseTotalDays > 0 ? available / baseTotalDays : 0;
-  const baseWeekendSpend = baseWeekendDays > 0 ? available / baseWeekendDays : 0;
-  const baseWeekendBudget = baseWeekendWindows > 0 ? available / baseWeekendWindows : 0;
   const projectedStartDate = new Date(startDate);
   projectedStartDate.setDate(projectedStartDate.getDate() + noSpendDays);
   const projectedTodayValue = toDateInputValue(projectedStartDate);
+  const historicalExpenseBeforeProjectedDate = allMovementEntries()
+    .filter((item) => item.type === "expense" && item.date >= periodStartValue && item.date < projectedTodayValue)
+    .reduce((total, item) => total + Number(item.amount || 0), 0);
+  const baselineAvailable = available + historicalExpenseBeforeProjectedDate;
+  const baseDiffMs = endDate.getTime() - periodStartDate.getTime();
+  const baseTotalDays = baseDiffMs >= 0 ? Math.floor(baseDiffMs / 86400000) + 1 : 0;
+  const baseWeekendDays = countWeekendDays(periodStartDate, endDate, runwayIncludeFridayValue);
+  const baseWeekendWindows = countWeekendWindows(periodStartDate, endDate, runwayIncludeFridayValue);
+  const baseDailySpend = baseTotalDays > 0 ? baselineAvailable / baseTotalDays : 0;
+  const baseWeekendSpend = baseWeekendDays > 0 ? baselineAvailable / baseWeekendDays : 0;
+  const baseWeekendBudget = baseWeekendWindows > 0 ? baselineAvailable / baseWeekendWindows : 0;
   const diffMs = endDate.getTime() - projectedStartDate.getTime();
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
   const weekendDays = countWeekendDays(projectedStartDate, endDate, runwayIncludeFridayValue);
@@ -2917,24 +2926,24 @@ function renderRunwayStats(stats) {
       value: gainedDaily > 0 ? money(gainedDaily) : "--",
       valueClass: gainedDaily > 0 ? "positive" : "",
       note: gainedDaily > 0
-        ? `oggi hai guadagnato ${money(gainedDaily)} rispetto al budget iniziale · +${tomorrowBonusPercent.toFixed(0)}%`
-        : "oggi non hai guadagnato extra rispetto al budget iniziale",
+        ? `rispetto al budget iniziale di ${money(baseEffectiveDailyBudget)} hai guadagnato ${money(gainedDaily)} · +${tomorrowBonusPercent.toFixed(0)}%`
+        : "nessun guadagno rispetto al budget iniziale del giorno",
     },
     {
       label: "Guadagnato sul giorno weekend",
       value: gainedWeekendDay > 0 ? money(gainedWeekendDay) : "--",
       valueClass: gainedWeekendDay > 0 ? "positive" : "",
       note: gainedWeekendDay > 0
-        ? `hai guadagnato ${money(gainedWeekendDay)} rispetto al budget weekend iniziale · +${nextWeekendDayBonusPercent.toFixed(0)}%`
-        : "nessun extra guadagnato sul prossimo giorno weekend",
+        ? `rispetto al budget iniziale di ${money(baseWeekendSpend)} hai guadagnato ${money(gainedWeekendDay)} · +${nextWeekendDayBonusPercent.toFixed(0)}%`
+        : "nessun guadagno rispetto al budget iniziale del giorno weekend",
     },
     {
       label: "Guadagnato sul fine settimana",
       value: gainedWeekend > 0 ? money(gainedWeekend) : "--",
       valueClass: gainedWeekend > 0 ? "positive" : "",
       note: gainedWeekend > 0
-        ? `hai guadagnato ${money(gainedWeekend)} rispetto al budget weekend iniziale · +${nextWeekendBonusPercent.toFixed(0)}%`
-        : "nessun extra guadagnato per il weekend successivo",
+        ? `rispetto al budget iniziale di ${money(baseWeekendBudget)} hai guadagnato ${money(gainedWeekend)} · +${nextWeekendBonusPercent.toFixed(0)}%`
+        : "nessun guadagno rispetto al budget iniziale del fine settimana",
     },
   ];
 
