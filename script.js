@@ -2887,10 +2887,11 @@ function renderRunwayStats(stats) {
     plannedAllowanceBeforeToday += isWeekendDay ? baseWeekendSpend : baseEffectiveDailyBudget;
     allowanceCursor.setDate(allowanceCursor.getDate() + 1);
   }
+  const carryoverSavingsBeforeToday = Math.max(0, plannedAllowanceBeforeToday - spentBeforeToday);
   const carryoverOverspendBeforeToday = Math.max(0, spentBeforeToday - plannedAllowanceBeforeToday);
-  const dailySpend = totalDays > 0 ? (available + todaySpent) / totalDays : 0;
-  const weekendSpend = weekendDays > 0 ? (available + weekendDaySpentCurrent) / weekendDays : 0;
-  const weekendBudget = weekendWindows > 0 ? (available + weekendSpentCurrent) / weekendWindows : 0;
+  const dailySpend = totalDays > 0 ? baseDailySpend + (carryoverSavingsBeforeToday / totalDays) : 0;
+  const weekendSpend = weekendDays > 0 ? baseWeekendSpend + (carryoverSavingsBeforeToday / weekendDays) : 0;
+  const weekendBudget = weekendWindows > 0 ? baseWeekendBudget + (carryoverSavingsBeforeToday / weekendWindows) : 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
   const effectiveTodaySpentAgainstBudget = todaySpent + carryoverOverspendBeforeToday;
   const todayRemaining = Math.max(0, effectiveDailyBudget - effectiveTodaySpentAgainstBudget);
