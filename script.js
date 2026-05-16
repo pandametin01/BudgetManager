@@ -112,6 +112,7 @@ const els = {
   runwayEndDate: document.getElementById("runwayEndDate"),
   runwayDailyBudget: document.getElementById("runwayDailyBudget"),
   runwayNoSpendDays: document.getElementById("runwayNoSpendDays"),
+  runwayGainStartDate: document.getElementById("runwayGainStartDate"),
   runwayIncludeFriday: document.getElementById("runwayIncludeFriday"),
   runwayStats: document.getElementById("runwayStats"),
   annualCards: document.getElementById("annualCards"),
@@ -180,6 +181,7 @@ let chartPeriodEndValue = "";
 let runwayEndDateValue = "";
 let runwayDailyBudgetValue = "";
 let runwayNoSpendDaysValue = 0;
+let runwayGainStartDateValue = "";
 let runwayIncludeFridayValue = true;
 let chartZoomRange = null;
 let investmentQuotes = {};
@@ -1638,6 +1640,9 @@ function populateForms() {
   if (els.runwayNoSpendDays) {
     els.runwayNoSpendDays.value = String(runwayNoSpendDaysValue || 0);
   }
+  if (els.runwayGainStartDate) {
+    els.runwayGainStartDate.value = getResolvedRunwayGainStartDate();
+  }
   if (els.runwayIncludeFriday) {
     els.runwayIncludeFriday.checked = runwayIncludeFridayValue;
   }
@@ -1810,6 +1815,24 @@ function getResolvedRunwayEndDate() {
     runwayEndDateValue = getDefaultRunwayEndDate();
   }
   return runwayEndDateValue;
+}
+
+function getDefaultRunwayGainStartDate() {
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const selectedMonth = getSelectedMonth();
+  if (!selectedMonth) {
+    return toDateInputValue(yesterday);
+  }
+  const monthStart = new Date(Number(selectedMonth.year), Number(selectedMonth.id), 1);
+  return toDateInputValue(yesterday < monthStart ? monthStart : yesterday);
+}
+
+function getResolvedRunwayGainStartDate() {
+  if (!runwayGainStartDateValue) {
+    runwayGainStartDateValue = getDefaultRunwayGainStartDate();
+  }
+  return runwayGainStartDateValue;
 }
 
 function getDefaultChartYearValue() {
@@ -2029,6 +2052,11 @@ function bindForms() {
   els.runwayNoSpendDays?.addEventListener("input", (event) => {
     const parsed = Number.parseInt(event.target.value || "0", 10);
     runwayNoSpendDaysValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    render();
+  });
+
+  els.runwayGainStartDate?.addEventListener("change", (event) => {
+    runwayGainStartDateValue = event.target.value || getDefaultRunwayGainStartDate();
     render();
   });
 
@@ -2796,10 +2824,8 @@ function renderRunwayStats(stats) {
   const endDate = new Date(`${endDateValue}T23:59:59`);
   const today = new Date();
   const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const selectedMonth = getSelectedMonth();
-  const periodStartDate = selectedMonth
-    ? new Date(Number(selectedMonth.year), Number(selectedMonth.id), 1)
-    : new Date(startDate);
+  const gainStartValue = getResolvedRunwayGainStartDate();
+  const periodStartDate = new Date(`${gainStartValue}T00:00:00`);
   const periodStartValue = toDateInputValue(periodStartDate);
   const noSpendDays = Math.max(0, Number(runwayNoSpendDaysValue || 0));
   const projectedStartDate = new Date(startDate);
@@ -2926,24 +2952,24 @@ function renderRunwayStats(stats) {
       value: gainedDaily > 0 ? money(gainedDaily) : "--",
       valueClass: gainedDaily > 0 ? "positive" : "",
       note: gainedDaily > 0
-        ? `rispetto al budget iniziale di ${money(baseEffectiveDailyBudget)} hai guadagnato ${money(gainedDaily)} · +${tomorrowBonusPercent.toFixed(0)}%`
-        : "nessun guadagno rispetto al budget iniziale del giorno",
+        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedDaily)} rispetto al budget iniziale di ${money(baseEffectiveDailyBudget)} · +${tomorrowBonusPercent.toFixed(0)}%`
+        : `nessun guadagno rispetto al budget iniziale contato dal ${formatDate(periodStartValue)}`,
     },
     {
       label: "Guadagnato sul giorno weekend",
       value: gainedWeekendDay > 0 ? money(gainedWeekendDay) : "--",
       valueClass: gainedWeekendDay > 0 ? "positive" : "",
       note: gainedWeekendDay > 0
-        ? `rispetto al budget iniziale di ${money(baseWeekendSpend)} hai guadagnato ${money(gainedWeekendDay)} · +${nextWeekendDayBonusPercent.toFixed(0)}%`
-        : "nessun guadagno rispetto al budget iniziale del giorno weekend",
+        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedWeekendDay)} rispetto al budget iniziale di ${money(baseWeekendSpend)} · +${nextWeekendDayBonusPercent.toFixed(0)}%`
+        : `nessun guadagno rispetto al budget iniziale del giorno weekend contato dal ${formatDate(periodStartValue)}`,
     },
     {
       label: "Guadagnato sul fine settimana",
       value: gainedWeekend > 0 ? money(gainedWeekend) : "--",
       valueClass: gainedWeekend > 0 ? "positive" : "",
       note: gainedWeekend > 0
-        ? `rispetto al budget iniziale di ${money(baseWeekendBudget)} hai guadagnato ${money(gainedWeekend)} · +${nextWeekendBonusPercent.toFixed(0)}%`
-        : "nessun guadagno rispetto al budget iniziale del fine settimana",
+        ? `dal ${formatDate(periodStartValue)} hai guadagnato ${money(gainedWeekend)} rispetto al budget iniziale di ${money(baseWeekendBudget)} · +${nextWeekendBonusPercent.toFixed(0)}%`
+        : `nessun guadagno rispetto al budget iniziale del fine settimana contato dal ${formatDate(periodStartValue)}`,
     },
   ];
 
