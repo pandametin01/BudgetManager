@@ -2797,6 +2797,13 @@ function renderRunwayStats(stats) {
   const today = new Date();
   const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const noSpendDays = Math.max(0, Number(runwayNoSpendDaysValue || 0));
+  const baseDiffMs = endDate.getTime() - startDate.getTime();
+  const baseTotalDays = baseDiffMs >= 0 ? Math.floor(baseDiffMs / 86400000) + 1 : 0;
+  const baseWeekendDays = countWeekendDays(startDate, endDate, runwayIncludeFridayValue);
+  const baseWeekendWindows = countWeekendWindows(startDate, endDate, runwayIncludeFridayValue);
+  const baseDailySpend = baseTotalDays > 0 ? available / baseTotalDays : 0;
+  const baseWeekendSpend = baseWeekendDays > 0 ? available / baseWeekendDays : 0;
+  const baseWeekendBudget = baseWeekendWindows > 0 ? available / baseWeekendWindows : 0;
   const projectedStartDate = new Date(startDate);
   projectedStartDate.setDate(projectedStartDate.getDate() + noSpendDays);
   const projectedTodayValue = toDateInputValue(projectedStartDate);
@@ -2836,9 +2843,13 @@ function renderRunwayStats(stats) {
   const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
   const weekendDayRemaining = Math.max(0, weekendSpend - weekendDaySpentCurrent);
   const weekendDayOverspend = Math.max(0, weekendDaySpentCurrent - weekendSpend);
-  const tomorrowBonusPercent = effectiveDailyBudget > 0 ? (todayRemaining / effectiveDailyBudget) * 100 : 0;
-  const nextWeekendDayBonusPercent = weekendSpend > 0 ? (weekendDayRemaining / weekendSpend) * 100 : 0;
-  const nextWeekendBonusPercent = weekendBudget > 0 ? (weekendRemaining / weekendBudget) * 100 : 0;
+  const baseEffectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, baseDailySpend) : baseDailySpend;
+  const gainedDaily = Math.max(0, effectiveDailyBudget - baseEffectiveDailyBudget);
+  const gainedWeekendDay = Math.max(0, weekendSpend - baseWeekendSpend);
+  const gainedWeekend = Math.max(0, weekendBudget - baseWeekendBudget);
+  const tomorrowBonusPercent = baseEffectiveDailyBudget > 0 ? (gainedDaily / baseEffectiveDailyBudget) * 100 : 0;
+  const nextWeekendDayBonusPercent = baseWeekendSpend > 0 ? (gainedWeekendDay / baseWeekendSpend) * 100 : 0;
+  const nextWeekendBonusPercent = baseWeekendBudget > 0 ? (gainedWeekend / baseWeekendBudget) * 100 : 0;
   const recoveryNote = recoveryDays > 0
     ? todayOverspend < effectiveDailyBudget
       ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
@@ -2903,26 +2914,26 @@ function renderRunwayStats(stats) {
     },
     {
       label: "Guadagnato oggi",
-      value: todayRemaining > 0 ? money(todayRemaining) : "--",
-      valueClass: todayRemaining > 0 ? "positive" : "",
-      note: todayRemaining > 0
-        ? `oggi hai guadagnato ${money(todayRemaining)} · +${tomorrowBonusPercent.toFixed(0)}% sul budget di domani`
-        : "oggi non hai guadagnato extra sul budget di domani",
+      value: gainedDaily > 0 ? money(gainedDaily) : "--",
+      valueClass: gainedDaily > 0 ? "positive" : "",
+      note: gainedDaily > 0
+        ? `oggi hai guadagnato ${money(gainedDaily)} rispetto al budget iniziale · +${tomorrowBonusPercent.toFixed(0)}%`
+        : "oggi non hai guadagnato extra rispetto al budget iniziale",
     },
     {
       label: "Guadagnato sul giorno weekend",
-      value: weekendDayRemaining > 0 ? money(weekendDayRemaining) : "--",
-      valueClass: weekendDayRemaining > 0 ? "positive" : "",
-      note: weekendDayRemaining > 0
-        ? `hai guadagnato ${money(weekendDayRemaining)} · +${nextWeekendDayBonusPercent.toFixed(0)}% sul prossimo giorno weekend`
+      value: gainedWeekendDay > 0 ? money(gainedWeekendDay) : "--",
+      valueClass: gainedWeekendDay > 0 ? "positive" : "",
+      note: gainedWeekendDay > 0
+        ? `hai guadagnato ${money(gainedWeekendDay)} rispetto al budget weekend iniziale · +${nextWeekendDayBonusPercent.toFixed(0)}%`
         : "nessun extra guadagnato sul prossimo giorno weekend",
     },
     {
       label: "Guadagnato sul fine settimana",
-      value: weekendRemaining > 0 ? money(weekendRemaining) : "--",
-      valueClass: weekendRemaining > 0 ? "positive" : "",
-      note: weekendRemaining > 0
-        ? `hai guadagnato ${money(weekendRemaining)} · +${nextWeekendBonusPercent.toFixed(0)}% sul prossimo weekend`
+      value: gainedWeekend > 0 ? money(gainedWeekend) : "--",
+      valueClass: gainedWeekend > 0 ? "positive" : "",
+      note: gainedWeekend > 0
+        ? `hai guadagnato ${money(gainedWeekend)} rispetto al budget weekend iniziale · +${nextWeekendBonusPercent.toFixed(0)}%`
         : "nessun extra guadagnato per il weekend successivo",
     },
   ];
