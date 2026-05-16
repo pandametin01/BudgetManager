@@ -2863,6 +2863,23 @@ function renderRunwayStats(stats) {
   const isTodayWeekend = runwayIncludeFridayValue
     ? (todayDay === 5 || todayDay === 6 || todayDay === 0)
     : (todayDay === 6 || todayDay === 0);
+  const expenseTotalBetween = (startValue, endExclusiveValue) => allMovementEntries()
+    .filter((item) => item.type === "expense" && item.date >= startValue && item.date < endExclusiveValue)
+    .reduce((total, item) => total + Number(item.amount || 0), 0);
+  const plannedAllowanceBefore = (boundaryDate) => {
+    let planned = 0;
+    const cursor = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth(), periodStartDate.getDate());
+    const limit = new Date(boundaryDate.getFullYear(), boundaryDate.getMonth(), boundaryDate.getDate());
+    while (cursor < limit) {
+      const day = cursor.getDay();
+      const isWeekendDay = runwayIncludeFridayValue
+        ? (day === 5 || day === 6 || day === 0)
+        : (day === 6 || day === 0);
+      planned += isWeekendDay ? baseWeekendSpend : baseEffectiveDailyBudget;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return planned;
+  };
   const weekendSpentCurrent = relevantWeekend
     ? allMovementEntries()
         .filter((item) => item.type === "expense" && item.date >= relevantWeekend.start && item.date <= relevantWeekend.end)
@@ -2873,27 +2890,25 @@ function renderRunwayStats(stats) {
         .filter((item) => item.type === "expense" && item.date === projectedTodayValue)
         .reduce((total, item) => total + Number(item.amount || 0), 0)
     : 0;
-  const spentBeforeToday = allMovementEntries()
-    .filter((item) => item.type === "expense" && item.date >= periodStartValue && item.date < projectedTodayValue)
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
-  let plannedAllowanceBeforeToday = 0;
-  const allowanceCursor = new Date(periodStartDate.getFullYear(), periodStartDate.getMonth(), periodStartDate.getDate());
-  const projectedBoundary = new Date(projectedStartDate.getFullYear(), projectedStartDate.getMonth(), projectedStartDate.getDate());
-  while (allowanceCursor < projectedBoundary) {
-    const day = allowanceCursor.getDay();
-    const isWeekendDay = runwayIncludeFridayValue
-      ? (day === 5 || day === 6 || day === 0)
-      : (day === 6 || day === 0);
-    plannedAllowanceBeforeToday += isWeekendDay ? baseWeekendSpend : baseEffectiveDailyBudget;
-    allowanceCursor.setDate(allowanceCursor.getDate() + 1);
-  }
-  const carryoverSavingsBeforeToday = Math.max(0, plannedAllowanceBeforeToday - spentBeforeToday);
-  const carryoverOverspendBeforeToday = Math.max(0, spentBeforeToday - plannedAllowanceBeforeToday);
-  const dailySpend = totalDays > 0 ? baseDailySpend + (carryoverSavingsBeforeToday / totalDays) : 0;
-  const weekendSpend = weekendDays > 0 ? baseWeekendSpend + (carryoverSavingsBeforeToday / weekendDays) : 0;
-  const weekendBudget = weekendWindows > 0 ? baseWeekendBudget + (carryoverSavingsBeforeToday / weekendWindows) : 0;
+  const spentBeforeToday = expenseTotalBetween(periodStartValue, projectedTodayValue);
+  const plannedAllowanceBeforeToday = plannedAllowanceBefore(projectedStartDate);
+  const netCarryoverBeforeToday = plannedAllowanceBeforeToday - spentBeforeToday;
+  const dailySpend = totalDays > 0 ? Math.max(0, baseDailySpend + (netCarryoverBeforeToday / totalDays)) : 0;
+  const weekendAnchorDate = relevantWeekend ? new Date(`${relevantWeekend.start}T00:00:00`) : null;
+  const weekendAnchorEndDate = relevantWeekend ? new Date(`${relevantWeekend.end}T23:59:59`) : null;
+  const weekendWindowsFromAnchor = weekendAnchorDate ? countWeekendWindows(weekendAnchorDate, endDate, runwayIncludeFridayValue) : 0;
+  const weekendDaysInCurrentWindow = weekendAnchorDate && weekendAnchorEndDate
+    ? countWeekendDays(weekendAnchorDate, weekendAnchorEndDate, runwayIncludeFridayValue)
+    : 0;
+  const spentBeforeWeekend = weekendAnchorDate ? expenseTotalBetween(periodStartValue, relevantWeekend.start) : 0;
+  const plannedAllowanceBeforeWeekend = weekendAnchorDate ? plannedAllowanceBefore(weekendAnchorDate) : 0;
+  const netCarryoverBeforeWeekend = plannedAllowanceBeforeWeekend - spentBeforeWeekend;
+  const weekendBudget = weekendWindowsFromAnchor > 0
+    ? Math.max(0, baseWeekendBudget + (netCarryoverBeforeWeekend / weekendWindowsFromAnchor))
+    : 0;
+  const weekendSpend = weekendDaysInCurrentWindow > 0 ? weekendBudget / weekendDaysInCurrentWindow : 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
-  const effectiveTodaySpentAgainstBudget = todaySpent + carryoverOverspendBeforeToday;
+  const effectiveTodaySpentAgainstBudget = todaySpent;
   const todayRemaining = Math.max(0, effectiveDailyBudget - effectiveTodaySpentAgainstBudget);
   const todayOverspend = Math.max(0, effectiveTodaySpentAgainstBudget - effectiveDailyBudget);
   const recoveryDays = effectiveDailyBudget > 0 && todayOverspend > 0 ? Math.ceil(todayOverspend / effectiveDailyBudget) : 0;
