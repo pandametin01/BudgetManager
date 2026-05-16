@@ -114,6 +114,8 @@ const els = {
   runwayNoSpendDays: document.getElementById("runwayNoSpendDays"),
   runwayGainStartDate: document.getElementById("runwayGainStartDate"),
   runwaySpeculativeSpend: document.getElementById("runwaySpeculativeSpend"),
+  runwaySpeculativeAdd: document.getElementById("runwaySpeculativeAdd"),
+  runwaySpeculativeReset: document.getElementById("runwaySpeculativeReset"),
   runwayStats: document.getElementById("runwayStats"),
   annualCards: document.getElementById("annualCards"),
   annualYearFilter: document.getElementById("annualYearFilter"),
@@ -183,6 +185,7 @@ let runwayDailyBudgetValue = "";
 let runwayNoSpendDaysValue = 0;
 let runwayGainStartDateValue = "";
 let runwaySpeculativeSpendValue = "";
+let runwaySpeculativeEntries = {};
 let chartZoomRange = null;
 let investmentQuotes = {};
 let investmentRefreshHandle = null;
@@ -1835,6 +1838,13 @@ function getResolvedRunwayGainStartDate() {
   return runwayGainStartDateValue;
 }
 
+function getProjectedRunwayDateValue() {
+  const today = new Date();
+  const projectedDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  projectedDate.setDate(projectedDate.getDate() + Math.max(0, Number(runwayNoSpendDaysValue || 0)));
+  return toDateInputValue(projectedDate);
+}
+
 function getDefaultChartYearValue() {
   return String(getSelectedMonth().year || new Date().getFullYear());
 }
@@ -2062,6 +2072,29 @@ function bindForms() {
 
   els.runwaySpeculativeSpend?.addEventListener("input", (event) => {
     runwaySpeculativeSpendValue = event.target.value;
+    render();
+  });
+
+  els.runwaySpeculativeAdd?.addEventListener("click", () => {
+    const amount = Math.max(0, Number(runwaySpeculativeSpendValue || 0));
+    if (!(amount > 0)) {
+      return;
+    }
+    const targetDate = getProjectedRunwayDateValue();
+    runwaySpeculativeEntries[targetDate] = Number(runwaySpeculativeEntries[targetDate] || 0) + amount;
+    runwaySpeculativeSpendValue = "";
+    if (els.runwaySpeculativeSpend) {
+      els.runwaySpeculativeSpend.value = "";
+    }
+    render();
+  });
+
+  els.runwaySpeculativeReset?.addEventListener("click", () => {
+    runwaySpeculativeEntries = {};
+    runwaySpeculativeSpendValue = "";
+    if (els.runwaySpeculativeSpend) {
+      els.runwaySpeculativeSpend.value = "";
+    }
     render();
   });
 
@@ -2839,10 +2872,15 @@ function renderRunwayStats(stats) {
   const projectedTodayValue = toDateInputValue(projectedStartDate);
   const configuredDailyBudget = Number(runwayDailyBudgetValue);
   const hasConfiguredDailyBudget = runwayDailyBudgetValue !== "" && !Number.isNaN(configuredDailyBudget) && configuredDailyBudget > 0;
-  const speculativeSpend = Math.max(0, Number(runwaySpeculativeSpendValue || 0));
+  const speculativeSpentBeforeToday = Object.entries(runwaySpeculativeEntries)
+    .filter(([date]) => date >= periodStartValue && date < projectedTodayValue)
+    .reduce((total, [, amount]) => total + Number(amount || 0), 0);
+  const speculativeSpendCurrent = Number(runwaySpeculativeEntries[projectedTodayValue] || 0);
+  const speculativeSpendTotal = Object.values(runwaySpeculativeEntries)
+    .reduce((total, amount) => total + Number(amount || 0), 0);
   const historicalExpenseBeforeProjectedDate = allMovementEntries()
     .filter((item) => item.type === "expense" && item.date >= periodStartValue && item.date < projectedTodayValue)
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
+    .reduce((total, item) => total + Number(item.amount || 0), 0) + speculativeSpentBeforeToday;
   const baselineAvailable = available + historicalExpenseBeforeProjectedDate;
   const baseDiffMs = endDate.getTime() - periodStartDate.getTime();
   const baseTotalDays = baseDiffMs >= 0 ? Math.floor(baseDiffMs / 86400000) + 1 : 0;
@@ -2866,14 +2904,14 @@ function renderRunwayStats(stats) {
     }
     return planned;
   };
-  const spentBeforeToday = expenseTotalBetween(periodStartValue, projectedTodayValue);
+  const spentBeforeToday = expenseTotalBetween(periodStartValue, projectedTodayValue) + speculativeSpentBeforeToday;
   const plannedAllowanceBeforeToday = plannedAllowanceBefore(projectedStartDate);
   const netCarryoverBeforeToday = plannedAllowanceBeforeToday - spentBeforeToday;
-  const scenarioAvailable = available - speculativeSpend;
+  const scenarioAvailable = available - speculativeSpendTotal;
   const dailySpreadBudget = totalDays > 0 ? scenarioAvailable / totalDays : 0;
-  const dailySpend = totalDays > 0 ? (baseDailySpend + (netCarryoverBeforeToday / totalDays) - (speculativeSpend / totalDays)) : 0;
+  const dailySpend = totalDays > 0 ? (baseDailySpend + (netCarryoverBeforeToday / totalDays) - (speculativeSpendCurrent / totalDays)) : 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
-  const effectiveTodaySpentAgainstBudget = todaySpent + speculativeSpend;
+  const effectiveTodaySpentAgainstBudget = todaySpent + speculativeSpendCurrent;
   const todayBalance = effectiveDailyBudget - effectiveTodaySpentAgainstBudget;
   const todayRemaining = Math.max(0, todayBalance);
   const todayOverspend = Math.max(0, -todayBalance);
@@ -2893,8 +2931,8 @@ function renderRunwayStats(stats) {
       label: "Soldi disponibili ora",
       value: money(scenarioAvailable),
       valueClass: scenarioAvailable < 0 ? "negative" : "",
-      note: speculativeSpend > 0
-        ? `include una spesa simulata di ${money(speculativeSpend)}`
+      note: speculativeSpendTotal > 0
+        ? `include spese simulate per ${money(speculativeSpendTotal)}`
         : "usa il totale disponibile del mese attivo",
     },
     {
@@ -2919,8 +2957,8 @@ function renderRunwayStats(stats) {
       value: totalDays > 0 ? money(todayBalance) : "--",
       valueClass: todayBalance < 0 ? "negative" : "",
       note: noSpendDays > 0
-        ? `nella data proiettata (${formatDate(projectedTodayValue)}) risultano spesi ${money(effectiveTodaySpentAgainstBudget)}${speculativeSpend > 0 ? ` · inclusa simulazione ${money(speculativeSpend)}` : ""}`
-        : `spesi oggi ${money(effectiveTodaySpentAgainstBudget)} sul limite giornaliero${speculativeSpend > 0 ? ` · inclusa simulazione ${money(speculativeSpend)}` : ""}`,
+        ? `nella data proiettata (${formatDate(projectedTodayValue)}) risultano spesi ${money(effectiveTodaySpentAgainstBudget)}${speculativeSpendCurrent > 0 ? ` · inclusa simulazione ${money(speculativeSpendCurrent)}` : ""}`
+        : `spesi oggi ${money(effectiveTodaySpentAgainstBudget)} sul limite giornaliero${speculativeSpendCurrent > 0 ? ` · inclusa simulazione ${money(speculativeSpendCurrent)}` : ""}`,
     },
     {
       label: "Recupero sforamento",
