@@ -2887,14 +2887,10 @@ function renderRunwayStats(stats) {
     plannedAllowanceBeforeToday += isWeekendDay ? baseWeekendSpend : baseEffectiveDailyBudget;
     allowanceCursor.setDate(allowanceCursor.getDate() + 1);
   }
-  const carryoverSavingsBeforeToday = Math.max(0, plannedAllowanceBeforeToday - spentBeforeToday);
   const carryoverOverspendBeforeToday = Math.max(0, spentBeforeToday - plannedAllowanceBeforeToday);
-  const gainedDaily = totalDays > 0 ? carryoverSavingsBeforeToday / totalDays : 0;
-  const gainedWeekendDay = weekendDays > 0 ? carryoverSavingsBeforeToday / weekendDays : 0;
-  const gainedWeekend = weekendWindows > 0 ? carryoverSavingsBeforeToday / weekendWindows : 0;
-  const dailySpend = baseDailySpend + gainedDaily;
-  const weekendSpend = baseWeekendSpend + gainedWeekendDay;
-  const weekendBudget = baseWeekendBudget + gainedWeekend;
+  const dailySpend = totalDays > 0 ? (available + todaySpent) / totalDays : 0;
+  const weekendSpend = weekendDays > 0 ? (available + weekendDaySpentCurrent) / weekendDays : 0;
+  const weekendBudget = weekendWindows > 0 ? (available + weekendSpentCurrent) / weekendWindows : 0;
   const effectiveDailyBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, dailySpend) : dailySpend;
   const effectiveTodaySpentAgainstBudget = todaySpent + carryoverOverspendBeforeToday;
   const todayRemaining = Math.max(0, effectiveDailyBudget - effectiveTodaySpentAgainstBudget);
@@ -2905,6 +2901,9 @@ function renderRunwayStats(stats) {
   const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
   const weekendDayRemaining = Math.max(0, weekendSpend - weekendDaySpentCurrent);
   const weekendDayOverspend = Math.max(0, weekendDaySpentCurrent - weekendSpend);
+  const gainedDaily = Math.max(0, effectiveDailyBudget - baseEffectiveDailyBudget);
+  const gainedWeekendDay = Math.max(0, weekendSpend - baseWeekendSpend);
+  const gainedWeekend = Math.max(0, weekendBudget - baseWeekendBudget);
   const tomorrowBonusPercent = baseEffectiveDailyBudget > 0 ? (gainedDaily / baseEffectiveDailyBudget) * 100 : 0;
   const nextWeekendDayBonusPercent = baseWeekendSpend > 0 ? (gainedWeekendDay / baseWeekendSpend) * 100 : 0;
   const nextWeekendBonusPercent = baseWeekendBudget > 0 ? (gainedWeekend / baseWeekendBudget) * 100 : 0;
