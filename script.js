@@ -2836,6 +2836,9 @@ function renderRunwayStats(stats) {
   const weekendOverspend = Math.max(0, weekendSpentCurrent - weekendBudget);
   const weekendDayRemaining = Math.max(0, weekendSpend - weekendDaySpentCurrent);
   const weekendDayOverspend = Math.max(0, weekendDaySpentCurrent - weekendSpend);
+  const tomorrowBonusPercent = effectiveDailyBudget > 0 ? (todayRemaining / effectiveDailyBudget) * 100 : 0;
+  const nextWeekendDayBonusPercent = weekendSpend > 0 ? (weekendDayRemaining / weekendSpend) * 100 : 0;
+  const nextWeekendBonusPercent = weekendBudget > 0 ? (weekendRemaining / weekendBudget) * 100 : 0;
   const recoveryNote = recoveryDays > 0
     ? todayOverspend < effectiveDailyBudget
       ? `oppure domani spendi ${money(recoveryTomorrowBudget)} per rientrare subito nel limite giornaliero`
@@ -2898,6 +2901,30 @@ function renderRunwayStats(stats) {
       value: weekendWindows > 0 ? money(weekendBudget) : "--",
       note: weekendNote,
     },
+    {
+      label: "Guadagnato oggi",
+      value: todayRemaining > 0 ? money(todayRemaining) : "--",
+      valueClass: todayRemaining > 0 ? "positive" : "",
+      note: todayRemaining > 0
+        ? `oggi hai guadagnato ${money(todayRemaining)} · +${tomorrowBonusPercent.toFixed(0)}% sul budget di domani`
+        : "oggi non hai guadagnato extra sul budget di domani",
+    },
+    {
+      label: "Guadagnato sul giorno weekend",
+      value: weekendDayRemaining > 0 ? money(weekendDayRemaining) : "--",
+      valueClass: weekendDayRemaining > 0 ? "positive" : "",
+      note: weekendDayRemaining > 0
+        ? `hai guadagnato ${money(weekendDayRemaining)} · +${nextWeekendDayBonusPercent.toFixed(0)}% sul prossimo giorno weekend`
+        : "nessun extra guadagnato sul prossimo giorno weekend",
+    },
+    {
+      label: "Guadagnato sul fine settimana",
+      value: weekendRemaining > 0 ? money(weekendRemaining) : "--",
+      valueClass: weekendRemaining > 0 ? "positive" : "",
+      note: weekendRemaining > 0
+        ? `hai guadagnato ${money(weekendRemaining)} · +${nextWeekendBonusPercent.toFixed(0)}% sul prossimo weekend`
+        : "nessun extra guadagnato per il weekend successivo",
+    },
   ];
 
   els.runwayStats.innerHTML = items
@@ -2905,7 +2932,7 @@ function renderRunwayStats(stats) {
       (item) => `
         <article class="kpi-card">
           <p class="eyebrow">${item.label}</p>
-          <strong>${item.value}</strong>
+          <strong class="${item.valueClass || ""}">${item.value}</strong>
           <p class="list-meta">${item.note}</p>
         </article>
       `,
