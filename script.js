@@ -2850,12 +2850,23 @@ function renderRunwayStats(stats) {
     .filter((item) => item.type === "expense" && item.date === projectedTodayValue)
     .reduce((total, item) => total + Number(item.amount || 0), 0);
   const availableAtStartOfProjectedDay = available - speculativeSpentBeforeToday + todaySpent;
-  const rawDailyBudget = totalDays > 0 ? availableAtStartOfProjectedDay / totalDays : 0;
-  const budgetMaxPerDay = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, rawDailyBudget) : rawDailyBudget;
   const spentAgainstToday = todaySpent + speculativeSpendCurrent;
-  const canStillSpendToday = budgetMaxPerDay - spentAgainstToday;
+  const availableAfterProjectedDaySpends = available - speculativeSpentBeforeToday - speculativeSpendCurrent;
+  const rawDailyBudgetStartOfDay = totalDays > 0 ? availableAtStartOfProjectedDay / totalDays : 0;
+  const rawDailyBudgetAfterSpends = totalDays > 0 ? availableAfterProjectedDaySpends / totalDays : 0;
+  const budgetMaxPerDay = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, rawDailyBudgetAfterSpends) : rawDailyBudgetAfterSpends;
+  const startOfDayBudget = hasConfiguredDailyBudget ? Math.min(configuredDailyBudget, rawDailyBudgetStartOfDay) : rawDailyBudgetStartOfDay;
+  const canStillSpendToday = startOfDayBudget - spentAgainstToday;
 
   const items = [
+    {
+      label: "Disponibile libero",
+      value: money(availableAfterProjectedDaySpends),
+      valueClass: availableAfterProjectedDaySpends < 0 ? "negative" : "",
+      note: speculativeSpendCurrent > 0 || speculativeSpentBeforeToday > 0
+        ? `include spese speculative per ${money(speculativeSpentBeforeToday + speculativeSpendCurrent)}`
+        : "usa il totale disponibile del mese attivo",
+    },
     {
       label: "Budget massimo al giorno",
       value: totalDays > 0 ? money(budgetMaxPerDay) : "--",
