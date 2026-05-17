@@ -84,7 +84,9 @@ let availableInstitutions = [];
 let linkedBankSession = null;
 let pendingBankImports = [];
 let showBankDebug = false;
+let plannerCategoryOptions = [...DEFAULT_BANK_CATEGORIES];
 const BANK_RANGE_PRESET_DAYS = {
+  today: 0,
   "5d": 5,
   "30d": 30,
   "1y": 365,
@@ -163,7 +165,7 @@ function applyPresetRange(preset, startInput, endInput) {
   }
 
   const days = BANK_RANGE_PRESET_DAYS[preset];
-  if (!days) {
+  if (days === undefined) {
     return;
   }
 
@@ -175,7 +177,7 @@ function applyPresetRange(preset, startInput, endInput) {
 
 function initializeRangeControls() {
   applyPresetRange(els.bankRangePreset?.value || "5d", els.bankRangeStart, els.bankRangeEnd);
-  applyPresetRange(els.bankImportPreset?.value || "30d", els.bankImportStart, els.bankImportEnd);
+  applyPresetRange(els.bankImportPreset?.value || "today", els.bankImportStart, els.bankImportEnd);
 }
 
 function describeRangeLabel(preset, dateFrom, dateTo) {
@@ -184,6 +186,9 @@ function describeRangeLabel(preset, dateFrom, dateTo) {
   }
   if (preset === "5d") {
     return "negli ultimi 5 giorni";
+  }
+  if (preset === "today") {
+    return "oggi";
   }
   if (preset === "30d") {
     return "negli ultimi 30 giorni";
@@ -569,7 +574,7 @@ function renderMissingTransactionsPreview() {
             <label>
               Categoria
               <select class="bank-preview-category" data-preview-index="${index}">
-                ${renderPreviewCategoryOptions(item.type, item.category || "")}
+                ${renderPreviewCategoryOptions(item.type, item.category || "", plannerCategoryOptions)}
               </select>
             </label>
             <label>
@@ -644,15 +649,15 @@ function renderPreviewTypeOptions(selectedType) {
     .join("");
 }
 
-function renderPreviewCategoryOptions(selectedType, selectedCategory) {
+function renderPreviewCategoryOptions(selectedType, selectedCategory, availablePlannerCategories = []) {
   const optionsByType = {
-    expense: [...DEFAULT_BANK_CATEGORIES],
+    expense: availablePlannerCategories.length ? [...availablePlannerCategories] : [...DEFAULT_BANK_CATEGORIES],
     income: ["Entrate"],
     saving: ["Risparmi"],
     debt: ["Debiti"],
   };
 
-  const baseOptions = optionsByType[selectedType] || [...DEFAULT_BANK_CATEGORIES];
+  const baseOptions = optionsByType[selectedType] || (availablePlannerCategories.length ? [...availablePlannerCategories] : [...DEFAULT_BANK_CATEGORIES]);
   const mergedOptions = [...new Set([...baseOptions, selectedCategory].filter(Boolean))];
 
   return mergedOptions
@@ -1359,6 +1364,7 @@ async function loadMissingBankTransactionsPreview() {
 
     const plannerState = plannerRow?.planner_state || { months: [] };
     const plannerCategories = buildPlannerCategorySuggestions(plannerState);
+    plannerCategoryOptions = plannerCategories.length ? plannerCategories : [...DEFAULT_BANK_CATEGORIES];
     const plannerLinkState = collectPlannerBankLinkState(plannerState);
     const importedExternalIds = new Set(
       (importedRowsResult.data || [])
