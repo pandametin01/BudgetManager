@@ -2846,9 +2846,48 @@ function renderRunwayStats(stats) {
   const speculativeSpendCurrent = Number(runwaySpeculativeEntries[projectedTodayValue] || 0);
   const diffMs = endDate.getTime() - projectedStartDate.getTime();
   const totalDays = diffMs >= 0 ? Math.floor(diffMs / 86400000) + 1 : 0;
-  const todaySpent = allMovementEntries()
-    .filter((item) => item.type === "expense" && item.date === projectedTodayValue)
-    .reduce((total, item) => total + Number(item.amount || 0), 0);
+  const projectedMonth = state.months.find((month) => monthKey(month) === projectedTodayValue.slice(0, 7));
+  const getFreePoolExpenseImpactForDate = (month, dateValue) => {
+    const expenseEntries = allMovementEntries().filter((item) => item.type === "expense" && item.date === dateValue);
+    if (!expenseEntries.length) {
+      return 0;
+    }
+    if (!month) {
+      return expenseEntries.reduce((total, item) => total + Number(item.amount || 0), 0);
+    }
+
+    const priorSpentByCategory = new Map();
+    month.transactions
+      .filter((item) => item.type === "expense" && item.date < dateValue)
+      .forEach((item) => {
+        const key = lowerText(item.category);
+        priorSpentByCategory.set(key, (priorSpentByCategory.get(key) || 0) + Number(item.amount || 0));
+      });
+
+    const todaySpentByCategory = new Map();
+    expenseEntries.forEach((item) => {
+      const key = lowerText(item.category);
+      todaySpentByCategory.set(key, (todaySpentByCategory.get(key) || 0) + Number(item.amount || 0));
+    });
+
+    let impact = 0;
+    todaySpentByCategory.forEach((todayAmount, key) => {
+      const categoryBudget = (month.categoryBudgets || []).find((entry) => lowerText(entry.name) === key);
+      if (!categoryBudget || categoryBudget.isUndefinedBudget) {
+        impact += todayAmount;
+        return;
+      }
+
+      const priorSpent = Number(priorSpentByCategory.get(key) || 0);
+      const remainingBudgetBeforeToday = Math.max(0, Number(categoryBudget.budget || 0) - priorSpent);
+      const coveredToday = Math.min(todayAmount, remainingBudgetBeforeToday);
+      impact += Math.max(0, todayAmount - coveredToday);
+    });
+
+    return impact;
+  };
+
+  const todaySpent = getFreePoolExpenseImpactForDate(projectedMonth, projectedTodayValue);
   const availableAtStartOfProjectedDay = available - speculativeSpentBeforeToday + todaySpent;
   const spentAgainstToday = todaySpent + speculativeSpendCurrent;
   const availableAfterProjectedDaySpends = available - speculativeSpentBeforeToday - speculativeSpendCurrent;
