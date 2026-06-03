@@ -207,8 +207,12 @@
               <p class="eyebrow">Impostazioni e budget</p>
               <h3>Categorie e budget del mese</h3>
             </div>
-            <button class="primary" data-action="jump-category-form">Aggiungi categoria</button>
+            <div class="archive-tools">
+              <button class="secondary" type="button" data-action="rollover-previous-category-budgets">Esporta residui mese precedente</button>
+              <button class="primary" type="button" data-action="jump-category-form">Aggiungi categoria</button>
+            </div>
           </div>
+          <p id="categoryRolloverStatus" class="list-meta"></p>
 
           <div class="dual-columns planner-columns">
             <form id="categoryForm" class="card-form category-form-card">

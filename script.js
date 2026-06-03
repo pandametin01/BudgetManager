@@ -153,6 +153,7 @@ const els = {
   incomeCount: document.getElementById("incomeCount"),
   billCount: document.getElementById("billCount"),
   categoryCount: document.getElementById("categoryCount"),
+  categoryRolloverStatus: document.getElementById("categoryRolloverStatus"),
   savingCount: document.getElementById("savingCount"),
   debtCount: document.getElementById("debtCount"),
   transactionCategorySelect: document.getElementById("transactionCategorySelect"),
@@ -779,6 +780,101 @@ function setCsvImportStatus(message, tone = "") {
   }
   els.csvImportStatus.textContent = message || "";
   els.csvImportStatus.className = tone ? `list-meta csv-import-status ${tone}` : "list-meta csv-import-status";
+}
+
+function setCategoryRolloverStatus(message, tone = "") {
+  if (!els.categoryRolloverStatus) {
+    return;
+  }
+  els.categoryRolloverStatus.textContent = message || "";
+  els.categoryRolloverStatus.className = tone ? `list-meta ${tone}` : "list-meta";
+}
+
+function roundCurrency(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function getCategorySpent(month, categoryName) {
+  return (month?.transactions || [])
+    .filter((item) => item.type === "expense" && lowerText(item.category) === lowerText(categoryName))
+    .reduce((acc, item) => acc + Number(item.amount || 0), 0);
+}
+
+function getPreviousChronologicalMonth(month) {
+  const months = getChronologicalMonths();
+  const index = months.findIndex((item) => monthKey(item) === monthKey(month));
+  return index > 0 ? months[index - 1] : null;
+}
+
+function rolloverPreviousCategoryBudgets() {
+  const targetMonth = getSelectedMonth();
+  const sourceMonth = getPreviousChronologicalMonth(targetMonth);
+
+  if (!sourceMonth) {
+    setCategoryRolloverStatus("Non c'e un mese precedente da cui esportare i residui.", "negative");
+    return;
+  }
+
+  const sourceCategories = sourceMonth.categoryBudgets || [];
+  if (!sourceCategories.length) {
+    setCategoryRolloverStatus(`Il mese precedente (${sourceMonth.name} ${sourceMonth.year}) non ha categorie da esportare.`, "negative");
+    return;
+  }
+
+  const targetCategories = targetMonth.categoryBudgets || [];
+  let transferredTotal = 0;
+  let transferredCount = 0;
+  let closedCount = 0;
+
+  sourceCategories.forEach((category) => {
+    const spent = roundCurrency(getCategorySpent(sourceMonth, category.name));
+    const remaining = category.isUndefinedBudget
+      ? 0
+      : roundCurrency(Math.max(0, Number(category.budget || 0) - spent));
+
+    if (!category.isUndefinedBudget) {
+      category.budget = spent;
+      category.isUndefinedBudget = true;
+      closedCount += 1;
+    }
+
+    if (remaining <= 0) {
+      return;
+    }
+
+    const existingTarget = targetCategories.find((item) => lowerText(item.name) === lowerText(category.name));
+    if (existingTarget) {
+      existingTarget.budget = roundCurrency(Number(existingTarget.budget || 0) + remaining);
+      existingTarget.isUndefinedBudget = false;
+    } else {
+      targetCategories.unshift({
+        id: crypto.randomUUID(),
+        name: category.name,
+        budget: remaining,
+        isUndefinedBudget: false,
+      });
+    }
+
+    transferredTotal = roundCurrency(transferredTotal + remaining);
+    transferredCount += 1;
+  });
+
+  targetMonth.categoryBudgets = targetCategories;
+
+  if (!transferredCount && !closedCount) {
+    setCategoryRolloverStatus(`Nessun residuo da esportare da ${sourceMonth.name} ${sourceMonth.year}.`, "negative");
+    return;
+  }
+
+  saveState();
+  populateForms();
+  render();
+  setCategoryRolloverStatus(
+    transferredCount
+      ? `Esportati ${money(transferredTotal)} da ${transferredCount} categorie di ${sourceMonth.name} ${sourceMonth.year}; mese precedente chiuso con budget indefinito.`
+      : `Nessun residuo positivo da esportare; ${closedCount} categorie di ${sourceMonth.name} ${sourceMonth.year} chiuse con budget indefinito.`,
+    "positive",
+  );
 }
 
 function detectCsvDelimiter(text) {
@@ -2384,6 +2480,25 @@ function bindActions() {
     if (action === "jump-category-form") {
       document.getElementById("categoryForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
       els.categoryForm.elements.namedItem("name")?.focus();
+      return;
+    }
+
+    if (action === "rollover-previous-category-budgets") {
+      const targetMonth = getSelectedMonth();
+      const sourceMonth = getPreviousChronologicalMonth(targetMonth);
+      if (!sourceMonth) {
+        setCategoryRolloverStatus("Non c'e un mese precedente da cui esportare i residui.", "negative");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Esporto i budget residui da ${sourceMonth.name} ${sourceMonth.year} a ${targetMonth.name} ${targetMonth.year} e chiudo il mese precedente con budget indefinito?`,
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      rolloverPreviousCategoryBudgets();
       return;
     }
 
